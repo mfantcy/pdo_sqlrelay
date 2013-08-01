@@ -9,7 +9,7 @@ You can get they at http://sqlrelay.sourceforge.net/
 #### PHP PDO
 PHP must installed PDO extension
 ###Installation on Linux, Unix or Unix-like Platforms
-Extracting pdo_sqlrelay
+extracting pdo_sqlrelay and follow the command below
 ```shell
 cd /path/to/pdo_sqlrelay
 phpize
@@ -20,4 +20,3 @@ phpize
 make
 make install
 ```
-
