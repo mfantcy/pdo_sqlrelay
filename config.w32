@@ -1,0 +1,12 @@
+// $Id$
+// vim:ft=javascript
+
+ARG_WITH("pdo-sqlrelay", "for pdo_sqlrelay support", "no");
+
+// Otherwise, use ARG_ENABLE
+// ARG_ENABLE("pdo_sqlrelay", "enable pdo_sqlrelay support", "no");
+
+if (PHP_PDO_SQLRELAY != "no") {
+	EXTENSION("pdo_sqlrelay", "pdo_sqlrelay.c sqlrelay_dbh.c sqlrelay_stmt.c");
+}
+
