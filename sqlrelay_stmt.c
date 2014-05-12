@@ -1,6 +1,5 @@
 /*
  *   +----------------------------------------------------------------------+
- *   | Created on: 2013/8/1                                                 |
  *   | Author: ZhiMing Zhu                                                  |
  *   +----------------------------------------------------------------------+
  */
@@ -22,29 +21,21 @@
 static int pdo_sqlrelay_fill_stmt(pdo_stmt_t *stmt TSRMLS_DC)
 {
 	pdo_sqlrelay_stmt *S = (pdo_sqlrelay_stmt *) stmt->driver_data;
-	int64_t row_count = (int64_t) sqlrcur_affectedRows(S->cur);
-	if(row_count <= 0)
+	int64_t row_count = (int64_t) sqlrcur_rowCount(S->cur);
+	if(row_count > 0)
 	{
-		S->row_count = (long) sqlrcur_affectedRows(S->cur);
-		if (S->row_count == -1)
-		{
-			S->row_count = (long) sqlrcur_rowCount(S->cur);
-		}
-		stmt->row_count = S->row_count;
+		S->row_count = stmt->row_count = row_count;
 		stmt->column_count = (int) sqlrcur_colCount(S->cur);
 		S->current_row = 0;
 		S->fetched = 0;
 		S->first_index = 0;
 		S->fetch_mode = PDO_FETCH_ORI_NEXT;
-		if (S->row_count > 0)
-		{
-			S->first_index = sqlrcur_firstRowIndex(S->cur);
-			S->current_row += S->first_index;
-		}
+		S->first_index = sqlrcur_firstRowIndex(S->cur);
+		S->current_row += S->first_index;
 	}
 	else
 	{
-		stmt->row_count = row_count;
+		stmt->row_count = (int64_t) sqlrcur_affectedRows(S->cur);
 	}
 	return 1;
 }
@@ -107,6 +98,7 @@ static int sqlrelay_stmt_execute(pdo_stmt_t *stmt TSRMLS_DC)
 		pdo_sqlrelay_error_stmt(stmt);
 		return 0;
 	}
+
 	pdo_sqlrelay_fill_stmt(stmt TSRMLS_CC);
 	return 1;
 
@@ -121,7 +113,6 @@ static int sqlrelay_stmt_fetch(pdo_stmt_t *stmt, enum pdo_fetch_orientation ori,
 	{
 		return 0;
 	}
-
 	S->fetch_mode = ori;
 
 	if (!S->fetched && offset > 0)
@@ -214,6 +205,10 @@ static int sqlrelay_stmt_get_col_data(pdo_stmt_t *stmt, int colno, char **ptr, u
 	*caller_frees = 1;
 	*len = (unsigned long) sqlrcur_getFieldLengthByIndex(S->cur, row_num, (uint32_t) colno);
 	*ptr = estrndup(sqlrcur_getFieldByIndex(S->cur, row_num, (uint32_t) colno), *len);
+	if(S->H->debug)
+	{
+		zend_printf("col_data %s", *ptr);
+	}
 	if (sqlrcur_errorNumber(S->cur))
 	{
 		pdo_sqlrelay_error_stmt(stmt);
@@ -261,17 +256,35 @@ static int sqlrelay_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_dat
 				param->driver_data = P;
 
 
-				switch (param->param_type)
+				switch (PDO_PARAM_TYPE(param->param_type))
 				{
 					case PDO_PARAM_STMT:
 						return 0;
+					case PDO_PARAM_BOOL:
 					case PDO_PARAM_INT:
 						convert_to_long(param->parameter);
 						sqlrcur_inputBindLong(S->cur, P->bind_name, (int64_t)Z_LVAL_P(param->parameter));
+						if (S->H->can_bind_out && Z_ISREF_P(param->parameter) && (param->param_type & PDO_PARAM_INPUT_OUTPUT))
+						{
+							//sqlrcur_defineOutputBindBlob(S->cur, P->bind_name);
+							sqlrcur_defineOutputBindInteger(S->cur, P->bind_name);
+							P->bind_out = 1;
+							S->has_bindout = 1;
+						}
 						break;
 
+					case PDO_PARAM_NULL:
+						convert_to_null(param->parameter);
+
+						break;
 					case PDO_PARAM_LOB:
 
+						if (S->H->can_bind_out && Z_ISREF_P(param->parameter) && (param->param_type & PDO_PARAM_INPUT_OUTPUT))
+						{
+							sqlrcur_defineOutputBindBlob(S->cur, P->bind_name);
+							P->bind_out = 1;
+							S->has_bindout = 1;
+						}
 						if (Z_TYPE_P(param->parameter) == IS_RESOURCE)
 						{
 							php_stream *stm;
@@ -294,20 +307,17 @@ static int sqlrelay_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_dat
 
 					case PDO_PARAM_STR:
 					default:
+						if (S->H->can_bind_out && Z_ISREF_P(param->parameter) && (param->param_type & PDO_PARAM_INPUT_OUTPUT))
+						{
+							sqlrcur_defineOutputBindString(S->cur, P->bind_name, (uint32_t)param->max_value_len);
+							P->bind_out = 1;
+							S->has_bindout = 1;
+						}
 						convert_to_string(param->parameter);
 						sqlrcur_inputBindStringWithLength(S->cur, P->bind_name, Z_STRVAL_P(param->parameter) ,Z_STRLEN_P(param->parameter));
 						break;
 				}
-				if(sqlrcur_validBind(S->cur, P->bind_name) == 0)
-				{
-					return 0;
-				}
-				if (S->H->can_bind_out && Z_ISREF_P(param->parameter))
-				{
-					sqlrcur_defineOutputBindBlob(S->cur, P->bind_name);
-					P->bind_out = 1;
-					S->has_bindout = 1;
-				}
+
 				S->has_bind = 1;
 				break;
 
@@ -350,6 +360,17 @@ static int sqlrelay_stmt_set_attr(pdo_stmt_t *stmt, long attr, zval *val TSRMLS_
 				sqlrcur_setResultSetBufferSize(S->cur, S->result_set_buffer_size);
 			}
 			return 1;
+		case PDO_SQLRELAY_ATTR_GET_COLUMN_INFO:
+			convert_to_boolean(val);
+			if (Z_BVAL_P(val)==TRUE)
+			{
+				sqlrcur_getColumnInfo(S->cur);
+			}
+			else
+			{
+				sqlrcur_dontGetColumnInfo(S->cur);
+			}
+			return 1;
 	}
 	return 0;
 }
@@ -362,6 +383,7 @@ static int sqlrelay_stmt_get_attr(pdo_stmt_t *stmt, long attr, zval *val TSRMLS_
 	switch(attr)
 	{
 		case PDO_SQLRELAY_ATTR_RESULT_SET_BUFFER_SIZE:
+			S->result_set_buffer_size = sqlrcur_getResultSetBufferSize(S->cur );
 			ZVAL_LONG(val, (long)S->result_set_buffer_size);
 			break;
 	}
@@ -405,6 +427,10 @@ static int sqlrelay_stmt_get_column_meta(pdo_stmt_t *stmt, long colno, zval *ret
 	{
 		add_next_index_string(flags, "blob", 1);
 	}
+	if (sqlrcur_getColumnIsAutoIncrementByIndex(S->cur, (uint32_t)colno)) {
+		add_next_index_string(flags, "auto_increment", 1);
+	}
+
 	add_assoc_zval(return_value, "flags", flags);
 
 	return SUCCESS;

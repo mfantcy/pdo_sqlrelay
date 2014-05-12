@@ -1,6 +1,5 @@
 /*
  *   +----------------------------------------------------------------------+
- *   | Created on: 2013/8/1                                                 |
  *   | Author: ZhiMing Zhu                                                  |
  *   +----------------------------------------------------------------------+
  *
@@ -137,8 +136,8 @@ static int sqlrelay_dbh_prepare(pdo_dbh_t *dbh, const char *sql, long sql_len, p
 		pdo_sqlrelay_error(dbh);
 		return 0;
 	}
-	sqlrcur_getColumnInfo(S->cur);
-	sqlrcur_setResultSetBufferSize(S->cur, 0);
+	//sqlrcur_getColumnInfo(S->cur);
+	S->result_set_buffer_size = sqlrcur_getResultSetBufferSize(S->cur);
 	if(H->fakebinds)
 	{
 		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
@@ -202,6 +201,7 @@ static int sqlrelay_dbh_prepare(pdo_dbh_t *dbh, const char *sql, long sql_len, p
 		pdo_sqlrelay_error_stmt(stmt);
 		return 0;
 	}
+
 	return 1;
 }
 /* }}} */
@@ -278,7 +278,11 @@ static int sqlrelay_dbh_quote(pdo_dbh_t *dbh, const char *unquoted, int unquoted
 static int sqlrelay_dbh_begin(pdo_dbh_t *dbh TSRMLS_DC)
 {
 	pdo_sqlrelay_db_handle *H = (pdo_sqlrelay_db_handle *) dbh->driver_data;
-	if(sqlrcon_begin(H->conn))
+	if (strstr("mysql", H->identify) && sqlrcon_autoCommitOff(H->conn))
+	{
+		return 1;
+	}
+	else if(sqlrcon_begin(H->conn))
 	{
 		return 1;
 	}
@@ -292,6 +296,9 @@ static int sqlrelay_dbh_commit(pdo_dbh_t *dbh TSRMLS_DC)
 	pdo_sqlrelay_db_handle *H = (pdo_sqlrelay_db_handle *) dbh->driver_data;
 	if(sqlrcon_commit(H->conn))
 	{
+		if(strstr("mysql", H->identify) && dbh->auto_commit){
+			sqlrcon_autoCommitOn(H->conn);
+		}
 		return 1;
 	}
 	return (0 == pdo_sqlrelay_error(dbh));
@@ -301,10 +308,12 @@ static int sqlrelay_dbh_commit(pdo_dbh_t *dbh TSRMLS_DC)
 /* {{{ sqlrelay_dbh_rollback */
 static int sqlrelay_dbh_rollback(pdo_dbh_t *dbh TSRMLS_DC)
 {
-
 	pdo_sqlrelay_db_handle *H = (pdo_sqlrelay_db_handle *) dbh->driver_data;
 	if(sqlrcon_rollback(H->conn))
 	{
+		if(strstr("mysql", H->identify) && dbh->auto_commit){
+			sqlrcon_autoCommitOn(H->conn);
+		}
 		return 1;
 	}
 	return (0 == pdo_sqlrelay_error(dbh));
@@ -443,6 +452,30 @@ static int sqlrelay_dbh_get_attr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC)
 			efree(info);
 			break;
 
+		case PDO_SQLRELAY_ATTR_DB_TYPE:
+			ZVAL_STRING(val, H->identify, 1);
+			break;
+
+		case PDO_SQLRELAY_ATTR_DB_VERSION:
+			ZVAL_STRING(val, (char *)sqlrcon_dbVersion(H->conn), 1);
+			break;
+
+		case PDO_SQLRELAY_ATTR_DB_HOST_NAME:
+			ZVAL_STRING(val, (char *)sqlrcon_dbHostName(H->conn), 1);
+			break;
+
+		case PDO_SQLRELAY_ATTR_DB_IP_ADDRESS:
+			ZVAL_STRING(val, (char *)sqlrcon_dbIpAddress(H->conn), 1);
+			break;
+
+		case PDO_SQLRELAY_ATTR_BIND_FORMAT:
+			ZVAL_STRING(val, (char *)sqlrcon_bindFormat(H->conn), 1);
+			break;
+
+		case PDO_SQLRELAY_ATTR_CURRENT_DB:
+			ZVAL_STRING(val, (char *)sqlrcon_getCurrentDatabase(H->conn) ,1);
+			break;
+
 		case PDO_ATTR_AUTOCOMMIT:
 			ZVAL_LONG(val, dbh->auto_commit);
 			break;
@@ -521,32 +554,39 @@ static int pdo_sqlrelay_handle_factory(pdo_dbh_t *dbh, zval *driver_options TSRM
 
 	struct pdo_data_src_parser vars[] = {
 		{ "dbname",     "",	         0 },
-		{ "host",       "localhost", 0 },
-		{ "port",       "9000",	     0 },
+		{ "host",       "",          0 },
+		{ "port",       "0",	     0 },
 		{ "socket",     "",	         0 },
 		{ "retrytime",  "0",         0 },
 		{ "tries",      "1",         0 },
+		{ "debug",      "0",         0 },
 	};
 
 	dbh->methods = &sqlrelay_methods;
-	php_pdo_parse_data_source(dbh->data_source, dbh->data_source_len, vars, 4);
+	php_pdo_parse_data_source(dbh->data_source, dbh->data_source_len, vars, 7);
 
 	H = pecalloc(1, sizeof(pdo_sqlrelay_db_handle), dbh->is_persistent);
 	H->err_info.code = 0;
 	H->err_info.msg = NULL;
-
+	H->debug = 0;
 	H->conn_timeout = 60;
 	H->res_timeout = 30;
 	dbname = vars[0].optval;
-	host = vars[1].optval;
-	if(vars[2].optval)
-	{
-		port = (uint16_t) atoi(vars[2].optval);
-	}
-	if (vars[1].optval && !strcmp("localhost", vars[1].optval))
+	if(vars[3].optval)
 	{
 		socket = vars[3].optval;
 	}
+	else if(vars[1].optval)
+	{
+		host = vars[1].optval;
+		port = 9000;
+		if(vars[2].optval)
+		{
+			port = (uint16_t) atoi(vars[2].optval);
+		}
+
+	}
+
 	if(vars[4].optval)
 	{
 		retrytime = (int32_t) atoi(vars[4].optval);
@@ -554,6 +594,11 @@ static int pdo_sqlrelay_handle_factory(pdo_dbh_t *dbh, zval *driver_options TSRM
 	if(vars[5].optval)
 	{
 		tries = (int32_t) atoi(vars[5].optval);
+	}
+
+	if(vars[6].optval && atoi(vars[6].optval) != 0)
+	{
+		H->debug = 1;
 	}
 	//H->conn = sqlrcon_alloc("localhost",9000,"","user1","password1",0,1);
 	H->conn = sqlrcon_alloc(host, port, socket, dbh->username, dbh->password, retrytime, tries);
@@ -572,21 +617,18 @@ static int pdo_sqlrelay_handle_factory(pdo_dbh_t *dbh, zval *driver_options TSRM
 		H->res_timeout = (int32_t) pdo_attr_lval(driver_options, PDO_SQLRELAY_ATTR_RESPONSE_TOMEOUT, 30 TSRMLS_CC);
 		H->fakebinds = pdo_attr_lval(driver_options, PDO_SQLRELAY_ATTR_FAKEBINDS, 0 TSRMLS_CC);
 		H->debug = pdo_attr_lval(driver_options, PDO_SQLRELAY_ATTR_DEBUG, 0 TSRMLS_CC);
-		if(	H->debug)
-		{
-			sqlrcon_debugOn(H->conn);
-			sqlrcon_debugPrintFunction(H->conn, zend_printf);
-		}
-		else
-		{
-			sqlrcon_debugOff(H->conn);
-		}
-
 	}
+
 	if (H->debug)
 	{
-		zend_printf("connection to host:%s port:%d socket:%s username:%s password:%s retytime:%d tries:%d\n", host, port, socket, dbh->username, dbh->password, retrytime, tries);
+		sqlrcon_debugOn(H->conn);
+		sqlrcon_debugPrintFunction(H->conn, zend_printf);
+		zend_printf("connection to host:%s port:%d socket:%s username:%s password:%s retytime:%d tries:%d debug:%s\n", host, port, socket, dbh->username, dbh->password, retrytime, tries, vars[6].optval);
 		zend_printf("bind format: %s\n", sqlrcon_bindFormat(H->conn));
+	}
+	else
+	{
+		sqlrcon_debugOff(H->conn);
 	}
 
 	if(sqlrcon_ping(H->conn) == 0)

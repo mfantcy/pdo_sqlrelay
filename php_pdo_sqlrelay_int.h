@@ -63,9 +63,15 @@ extern int _pdo_sqlrelay_error(pdo_dbh_t *dbh, pdo_stmt_t *stmt, sqlrcur cur, co
 #define pdo_sqlrelay_error_stmt(stmt) _pdo_sqlrelay_error(stmt->dbh, stmt, NULL, __FILE__, __LINE__ TSRMLS_CC)
 #define pdo_sqlrelay_error_cur(dbh, cur) _pdo_sqlrelay_error(dbh, NULL, cur, __FILE__, __LINE__ TSRMLS_CC)
 
-
 enum {
 	PDO_SQLRELAY_ATTR_RESULT_SET_BUFFER_SIZE = PDO_ATTR_DRIVER_SPECIFIC,
+	PDO_SQLRELAY_ATTR_GET_COLUMN_INFO,
+	PDO_SQLRELAY_ATTR_DB_TYPE,
+	PDO_SQLRELAY_ATTR_DB_VERSION,
+	PDO_SQLRELAY_ATTR_DB_HOST_NAME,
+	PDO_SQLRELAY_ATTR_DB_IP_ADDRESS,
+	PDO_SQLRELAY_ATTR_BIND_FORMAT,
+	PDO_SQLRELAY_ATTR_CURRENT_DB,
 	PDO_SQLRELAY_ATTR_CONNECT_TIMEOUT,
 	PDO_SQLRELAY_ATTR_RESPONSE_TOMEOUT,
 	PDO_SQLRELAY_ATTR_DEBUG,
