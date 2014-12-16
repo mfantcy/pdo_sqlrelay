@@ -232,48 +232,6 @@ static long sqlrelay_dbh_do(pdo_dbh_t *dbh, const char *sql, long sql_len TSRMLS
 }
 /* }}} */
 
-/* {{{ sqlrelay_dbh_quote */
-static int sqlrelay_dbh_quote(pdo_dbh_t *dbh, const char *unquoted, int unquotedlen,
-			char **quoted, int *quotedlen, enum pdo_param_type paramtype TSRMLS_DC)
-{
-	/* TODO:
-	 * figure it out it's right ?
-	 * I think query string must escaping base on each SQL Server
-	 * */
-    int quote_count = 0;
-    char const *ts, *l, *r;
-    char *c;
-
-    if (!unquotedlen)
-    {
-        *quotedlen = 2;
-        *quoted = malloc(*quotedlen+1);
-        strcpy(*quoted, "''");
-        return 1;
-    }
-    /* counting single quotes */
-    for (ts = unquoted; (ts = strchr(ts,'\'')); quote_count++, ts++){}
-
-    *quotedlen = unquotedlen + quote_count + 2;
-    *quoted = c = emalloc(*quotedlen+1);
-    *c++ = '\'';
-
-    for (l = unquoted; (r = strchr(l,'\'')); l = r+1)
-    {
-        strncpy(c, l, r-l);
-        c += (r-l);
-        *c++ = '\\';
-        *c++ = '\'';
-    }
-
-    strncpy(c, l, *quotedlen-(c-*quoted)-1);
-    (*quoted)[*quotedlen-1] = '\'';
-    (*quoted)[*quotedlen]   = '\0';
-
-    return 1;
-}
-/* }}} */
-
 /* {{{ sqlrelay_dbh_begin */
 static int sqlrelay_dbh_begin(pdo_dbh_t *dbh TSRMLS_DC)
 {
@@ -527,7 +485,7 @@ static struct pdo_dbh_methods sqlrelay_methods = {
 		sqlrelay_dbh_close,
 		sqlrelay_dbh_prepare,
 		sqlrelay_dbh_do,
-		sqlrelay_dbh_quote,
+		NULL,
 		sqlrelay_dbh_begin,
 		sqlrelay_dbh_commit,
 		sqlrelay_dbh_rollback,

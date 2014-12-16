@@ -21,7 +21,7 @@
 #include "zend_exceptions.h"
 #include "zend_modules.h"
 
-#define PHP_PDO_SQLRELAY_MODULE_VERSION	"0.1.3"
+#define PHP_PDO_SQLRELAY_MODULE_VERSION	"0.1.4"
 
 
 /* {{{ pdo_sqlrelay_functions[] */
