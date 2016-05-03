@@ -14,10 +14,11 @@ PHP_ARG_WITH(rudiments, for location of rudiments,
 [  --with-rudiments[=DIR]     PDO SQL Relay: Set the path to rudiments install prefix 
                                    default [/usr/local]])
 
-if test "$PHP_PDO_SQLRELAY" != "no"; then
+if test "$PHP_PDO_SQLRELAY" != "no"; then  
   if test "$PHP_PDO" = "no" && test "$ext_shared" = "no"; then
       AC_MSG_ERROR([PDO is not enabled! Add --enable-pdo to your configure line.])
   fi
+  PHP_REQUIRE_CXX()
 
   # --with-pdo-sqlrelay -> check with-path
   SEARCH_PATH="/usr/local/firstworks /usr/local /usr"
@@ -102,5 +103,5 @@ if test "$PHP_PDO_SQLRELAY" != "no"; then
   PHP_ADD_LIBRARY([sqlrclient],, PDO_SQLRELAY_SHARED_LIBADD)
   
   PHP_SUBST(PDO_SQLRELAY_SHARED_LIBADD)
-  PHP_NEW_EXTENSION(pdo_sqlrelay, pdo_sqlrelay.c sqlrelay_dbh.c sqlrelay_stmt.c, $ext_shared,,-I$pdo_inc_path -I)
+  PHP_NEW_EXTENSION(pdo_sqlrelay, pdo_sqlrelay.cpp sqlrelay_dbh.cpp sqlrelay_stmt.cpp, $ext_shared,,-I$pdo_inc_path -I)
 fi
