@@ -12,9 +12,11 @@
 int sqlrelayDebugPrint(const char * tpl, ...)
 {
 	int ret;
+	char buff[500];
 	va_list args;
 	va_start (args, tpl);
-	ret = vprintf (tpl, args);
+	vsprintf (buff, tpl, args);
+	ret = (int) zend_printf(buff);
 	va_end (args);
 	return ret;
 }
@@ -22,28 +24,18 @@ int sqlrelayDebugPrint(const char * tpl, ...)
 int PDOSqlrelayDebugPrint(const char * tpl, ...)
 {
 	int ret;
-	char buff[500];
+	char buff[200];
+	char buff2[500];
 	va_list args;
 	va_start (args, tpl);
 	sprintf(buff, "PDO_SQLRELAY_DEBUG: %s\n", tpl);
-	ret = vprintf (buff, args);
+	vsprintf (buff2, buff, args);
+	ret = (int) zend_printf(buff2);
 	va_end (args);
 	return ret;
 }
 
-void freePDOSqlrelayErrorInfo(PDOSqlrelayErrorInfo * errorInfo)
-{
-	if (errorInfo) {
-		if (errorInfo->file) {
-			efree(errorInfo->file);
-		}
-		if (errorInfo->msg) {
-			efree(errorInfo->msg);
-		}
-		efree(errorInfo);
-	}
 
-}
 
 int _setPDOSqlrelayHandlerError(pdo_dbh_t *dbh, pdo_stmt_t *stmt, const char *message, const int code, const char * file, int line)
 {
@@ -52,46 +44,40 @@ int _setPDOSqlrelayHandlerError(pdo_dbh_t *dbh, pdo_stmt_t *stmt, const char *me
 	PDOSqlrelayErrorInfo *errorInfo;
 	sqlrconnection *sqlrelayConnection;
 	sqlrcursor *sqlrelayCursor = NULL;
-
+	char *stateStr;
 	sqlrelayConnection = sqlrelayHandler->connection;
 
 	if (stmt) {
 		PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
 		sqlrelayCursor = sqlrelayStatement->cursor;
 		pdoError = &stmt->error_code;
-		if (sqlrelayStatement->errorInfo)
-			freePDOSqlrelayErrorInfo(sqlrelayStatement->errorInfo);
-
-		sqlrelayStatement->errorInfo = (PDOSqlrelayErrorInfo*) emalloc(sizeof(PDOSqlrelayErrorInfo));
-		errorInfo = sqlrelayStatement->errorInfo;
+		errorInfo = &sqlrelayStatement->errorInfo;
 	} else {
 		pdoError = &dbh->error_code;
-		if (sqlrelayHandler->errorInfo)
-			freePDOSqlrelayErrorInfo(sqlrelayHandler->errorInfo);
-
-		sqlrelayHandler->errorInfo = (PDOSqlrelayErrorInfo*) emalloc(sizeof(PDOSqlrelayErrorInfo));
-		errorInfo = sqlrelayHandler->errorInfo;
+		errorInfo = &sqlrelayHandler->errorInfo;
 	}
 
 	if (message) {
-		errorInfo->msg = estrndup(message, strlen(message));
+		errorInfo->msg = pestrdup(message, dbh->is_persistent);
 		errorInfo->code = code;
 	} else {
-		if (sqlrelayCursor->errorNumber()) {
-			errorInfo->msg = estrdup(sqlrelayCursor->errorMessage());
+		if (sqlrelayCursor && sqlrelayCursor->errorNumber()) {
+			errorInfo->msg = pestrdup(sqlrelayCursor->errorMessage(), dbh->is_persistent);
 			errorInfo->code = sqlrelayCursor->errorNumber();
 		} else if (sqlrelayConnection->errorNumber()) {
-			errorInfo->msg = estrdup(sqlrelayConnection->errorMessage());
+			errorInfo->msg = pestrdup(sqlrelayConnection->errorMessage(), dbh->is_persistent);
 			errorInfo->code = sqlrelayConnection->errorNumber();
 		} else {
 			strcpy(*pdoError, PDO_ERR_NONE);
 			return 0;
 		}
 	}
-	strcpy(*pdoError, "SQLRe");
-	PDOSqlrelayDebugPrint(errorInfo->msg);
-	errorInfo->line =  line;
-	errorInfo->file = estrndup(file, strlen(file));
+	stateStr = getPDOSqlState(errorInfo->code);
+	strcpy(*pdoError, stateStr);
+	if (sqlrelayHandler->debug) {
+		PDOSqlrelayDebugPrint(errorInfo->msg);
+	}
+
 	return 1;
 }
 
@@ -104,7 +90,13 @@ static int sqlrealyHandlerClose(pdo_dbh_t *dbh TSRMLS_DC)
 	if (!sqlrelayHandler)
 		return 0;
 
+	sqlrelayHandler->errorInfo.code = 0;
+	if (sqlrelayHandler->errorInfo.msg) {
+		pefree(sqlrelayHandler->errorInfo.msg, dbh->is_persistent);
+	}
+
 	if (sqlrelayHandler->connection) {
+		sqlrelayHandler->connection->endSession();
 		delete (sqlrconnection *)sqlrelayHandler->connection;
 		sqlrelayHandler->connection = NULL;
 	}
@@ -135,29 +127,69 @@ static int sqlrelayHandlerPrepare(
 		pdo_stmt_t *stmt,
 		zval *driverOptions TSRMLS_DC)
 {
+	int ret;
+	char *nsql = NULL;
+#if PHP_MAJOR_VERSION < 7
+	int nsqlLen = 0;
+#else
+	size_t nsqlLen = 0;
+#endif
 
 	PDOSqlrelayHandler *sqlrelayHandler = (PDOSqlrelayHandler *) dbh->driver_data;
+
+	if (sqlLen == 0) {
+		strcpy(dbh->error_code, "42000");
+		return 0;
+	}
+
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement*) ecalloc(1, sizeof(PDOSqlrelayStatement));
 
-	sqlrcursor * sqlrelsyCursor = new sqlrcursor(sqlrelayHandler->connection, true);
-	sqlrelsyCursor->setResultSetBufferSize(0);
-	sqlrelsyCursor->getColumnInfo();
-	sqlrelsyCursor->prepareQuery(sql, sqlLen);
+	sqlrelayStatement->numOfParams = 0;
+	sqlrcursor * sqlrelayCursor = new sqlrcursor(sqlrelayHandler->connection, true);
+	sqlrelayCursor->setResultSetBufferSize(0);
+	sqlrelayCursor->getColumnInfo();
+	sqlrelayCursor->getNullsAsNulls();
+	const char * bindFormat = sqlrelayHandler->connection->bindFormat();
 
-	sqlrelayStatement->cursor = sqlrelsyCursor;
+	if (strcmp("?", bindFormat) == 0) {
+		stmt->supports_placeholders = PDO_PLACEHOLDER_POSITIONAL;
+	} else if (strcmp(":", bindFormat) == 0) {
+		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
+	} else {
+		stmt->supports_placeholders = PDO_PLACEHOLDER_NONE;
+	}
+#if PHP_MAJOR_VERSION < 7
+	ret = pdo_parse_params(stmt, (char*)sql, sqlLen, &nsql, &nsqlLen TSRMLS_CC);
+#else
+	ret = pdo_parse_params(stmt, (char*)sql, sqlLen, &nsql, &nsqlLen);
+#endif
+
+	if (ret == 1) { /* query was rewritten */
+		sql = nsql;
+		sqlLen = nsqlLen;
+	} else if (ret == -1) { /* failed to parse */
+		strcpy(dbh->error_code, stmt->error_code);
+		return 0;
+	}
+
+	sqlrelayStatement->cursor = sqlrelayCursor;
 	sqlrelayStatement->handler = sqlrelayHandler;
-	sqlrelayStatement->query = sql;
-	sqlrelayStatement->queryLen = sqlLen;
 	sqlrelayStatement->done = false;
 	sqlrelayStatement->cursorScroll = pdo_attr_lval(driverOptions, PDO_ATTR_CURSOR, PDO_CURSOR_SCROLL TSRMLS_CC) == PDO_CURSOR_SCROLL;
+	sqlrelayStatement->errorInfo.msg = NULL;
+	sqlrelayStatement->errorInfo.code = 0;
 
 	stmt->driver_data = sqlrelayStatement;
 	stmt->methods = &PDOSqlrelayStatementMethods;
 	stmt->column_count = 0;
 	stmt->columns = NULL;
 	stmt->row_count = 0;
-	stmt->supports_placeholders = PDO_PLACEHOLDER_POSITIONAL;
 
+	sqlrelayCursor->prepareQuery(sql, sqlLen);
+	sqlrelayStatement->numOfParams = (uint32_t) sqlrelayCursor->countBindVariables();
+	if (nsql) {
+		efree(nsql);
+	}
 	return 1;
 }
 #if PHP_MAJOR_VERSION < 7
@@ -168,16 +200,19 @@ static zend_long sqlrelayHandlerExec(pdo_dbh_t *dbh, const char *sql, size_t sql
 {
 	PDOSqlrelayHandler *sqlrelayHandler = (PDOSqlrelayHandler *) dbh->driver_data;
 	sqlrcursor sqlrelayCursor(sqlrelayHandler->connection);
+
 	if (!sqlrelayCursor.sendQuery(sql, sqlLen)) {
 		setSqlrelayHandlerErrorMsg(dbh, sqlrelayCursor.errorMessage(), (const int)sqlrelayCursor.errorNumber());
 		return -1;
 	}
 
 #if PHP_MAJOR_VERSION < 7
-	return sqlrelayCursor.affectedRows();
+	long ret = sqlrelayCursor.affectedRows();
 #else
-	return (zend_long)sqlrelayCursor.affectedRows();
+	zend_long ret = (zend_long)sqlrelayCursor.affectedRows();
 #endif
+	sqlrelayCursor.closeResultSet();
+	return ret;
 }
 
 static int sqlrealyHandlerBegin(pdo_dbh_t *dbh TSRMLS_DC)
@@ -231,6 +266,7 @@ static int sqlrelayHandlerSetAttr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC
 			break;
 		}
 		return 1;
+
 	case PDO_SQLRELAY_ATTR_CONNECT_TIMEOUT:
 		if (sqlrelayHandler->connectionTimeout != ((int) Z_LVAL_P(val))) {
 			sqlrelayHandler->connectionTimeout = (int) Z_LVAL_P(val);
@@ -259,6 +295,8 @@ static int sqlrelayHandlerSetAttr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC
 			break;
 		}
 		return 1;
+
+	case PDO_ATTR_FETCH_TABLE_NAMES:
 	default:
 		return 0;
 	}
@@ -266,7 +304,7 @@ static int sqlrelayHandlerSetAttr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC
 	if (sqlrelayHandler->connection->errorNumber())
 		return -1;
 
-	return 0;
+	return 1;
 }
 
 
@@ -296,30 +334,30 @@ static int sqlrealyHandlerFetchError(pdo_dbh_t *dbh, pdo_stmt_t *stmt, zval *inf
 	PDOSqlrelayHandler *sqlrelayHandler = (PDOSqlrelayHandler *) dbh->driver_data;
 	PDOSqlrelayStatement *sqlrelayStatement;
 	long errorNumber = 0;
-	const char * errorMessage;
-
+	const char * errorMessage = NULL;
+	PDOSqlrelayErrorInfo * errorInfo;
 	if (stmt) {
 		sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
-		if (sqlrelayStatement->errorInfo) {
-			errorNumber = sqlrelayStatement->errorInfo->code;
-			errorMessage = sqlrelayStatement->errorInfo->msg;
+		if (sqlrelayStatement->errorInfo.code) {
+			errorNumber = sqlrelayStatement->errorInfo.code;
+			errorMessage = sqlrelayStatement->errorInfo.msg;
 		} else {
 			errorNumber = (long)sqlrelayStatement->cursor->errorNumber();
 			errorMessage = sqlrelayStatement->cursor->errorMessage();
 		}
 	}
 
-	if (!errorMessage) {
-		if (sqlrelayHandler->errorInfo) {
-			errorNumber = sqlrelayHandler->errorInfo->code;
-			errorMessage = sqlrelayHandler->errorInfo->msg;
+	if (!errorNumber) {
+		if (sqlrelayHandler->errorInfo.code) {
+			errorNumber = sqlrelayHandler->errorInfo.code;
+			errorMessage = sqlrelayHandler->errorInfo.msg;
 		} else {
 			errorNumber = (long)sqlrelayHandler->connection->errorNumber();
 			errorMessage = sqlrelayHandler->connection->errorMessage();
 		}
 	}
 
-	if (!errorMessage)
+	if (!errorNumber)
 		return 0;
 
 	add_next_index_long(info, errorNumber);
@@ -332,6 +370,9 @@ static int sqlrelayHandlerGetAttr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC
 {
 	PDOSqlrelayHandler *sqlrelayHandler = (PDOSqlrelayHandler *) dbh->driver_data;
 	switch (attr) {
+	case PDO_ATTR_FETCH_TABLE_NAMES:
+		ZVAL_BOOL(val, 0);
+		break;
 	case PDO_ATTR_CLIENT_VERSION:
 		SQLR_ZVAL_STRING(val, sqlrelayHandler->connection->clientVersion(), 1);
 		break;
@@ -341,13 +382,18 @@ static int sqlrelayHandlerGetAttr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC
 		break;
 
 	case PDO_ATTR_CONNECTION_STATUS:
-		ZVAL_BOOL(val, sqlrelayHandler->connection->ping());
-		return 1;
+		if (sqlrelayHandler->connection->ping()) {
+			char info[50];
+			sprintf(info, "%s %s connected", sqlrelayHandler->identify, sqlrelayHandler->connection->serverVersion());
+			SQLR_ZVAL_STRING(val, info, 1);
+		} else {
+			SQLR_ZVAL_STRING(val, "not connected", 1);
+		}
 		break;
 
 	case PDO_ATTR_SERVER_INFO:
 		char info[50];
-		sprintf(info, "%s %s", sqlrelayHandler->identify, sqlrelayHandler->connection->serverVersion());
+		sprintf(info, "sqlrelay %s", sqlrelayHandler->connection->serverVersion());
 		SQLR_ZVAL_STRING(val, info, 1);
 		break;
 
@@ -377,29 +423,25 @@ static int sqlrelayHandlerGetAttr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC
 
 	case PDO_ATTR_AUTOCOMMIT:
 		ZVAL_LONG(val, dbh->auto_commit);
-		return 1;
 		break;
 
 	case PDO_SQLRELAY_ATTR_CONNECT_TIMEOUT:
 		ZVAL_LONG(val, (long)sqlrelayHandler->connectionTimeout);
-		return 1;
 		break;
 
 	case PDO_SQLRELAY_ATTR_RESPONSE_TOMEOUT:
 		ZVAL_LONG(val, (long)sqlrelayHandler->responseTimeout);
-		return 1;
 		break;
 
 	case PDO_SQLRELAY_ATTR_DEBUG:
 		ZVAL_BOOL(val, sqlrelayHandler->debug);
-		return 1;
 		break;
 
 	default:
 		return 0;
 	}
 
-	if (!sqlrelayHandler->connection->errorNumber())
+	if (sqlrelayHandler->connection->errorNumber() != 0)
 			return -1;
 	return 1;
 }
@@ -517,7 +559,8 @@ static int PDOSqlrelayHandlerFactory(pdo_dbh_t *dbh, zval *driver_options TSRMLS
 
 		if (!setInitPDOOptions(driver_options, sqlrelayHandler TSRMLS_CC))
 			break;
-
+		sqlrelayHandler->errorInfo.msg = NULL;
+		sqlrelayHandler->errorInfo.code = 0;
 		sqlrelayHandler->connection = new sqlrconnection(
 				sqlrelayHandler->host,
 				sqlrelayHandler->port,
@@ -539,7 +582,6 @@ static int PDOSqlrelayHandlerFactory(pdo_dbh_t *dbh, zval *driver_options TSRMLS
 		sqlrelayConnection->setResponseTimeout(sqlrelayHandler->responseTimeout, 0);
 		sqlrelayConnection->setAuthenticationTimeout(sqlrelayHandler->authenticationTimeout, 0);
 		dbh->driver_data = sqlrelayHandler;
-		PDOSqlrelayDebugPrint("set debug:::: %d", sqlrelayHandler->debug);
 		if (sqlrelayHandler->debug) {
 			sqlrelayConnection->debugOn();
 			sqlrelayConnection->debugPrintFunction(sqlrelayDebugPrint);
@@ -583,7 +625,10 @@ static int PDOSqlrelayHandlerFactory(pdo_dbh_t *dbh, zval *driver_options TSRMLS
 		ret = 1;
     } while(0);
 
+    dbh->alloc_own_columns = 1;
 	dbh->methods = &sqlrelay_methods;
+
+
     return ret;
 }
 

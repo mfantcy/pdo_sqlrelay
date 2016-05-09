@@ -28,14 +28,14 @@ static int PDOSqlrelayFillStmt(pdo_stmt_t *stmt TSRMLS_DC)
     PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
     sqlrcursor * cursor = sqlrelayStatement->cursor;
     int64_t rowCount = (int64_t) cursor->rowCount();
+    stmt->column_count = (int) cursor->colCount();
+    sqlrelayStatement->done = true;
     if (rowCount > 0) {
     	sqlrelayStatement->rowCount = stmt->row_count = rowCount;
-    	stmt->column_count = (int) cursor->colCount();
     	sqlrelayStatement->fetched = false;
     	sqlrelayStatement->firstIndex = cursor->firstRowIndex();
     	sqlrelayStatement->fetchMode = PDO_FETCH_ORI_NEXT;
     	sqlrelayStatement->currentRow = sqlrelayStatement->firstIndex;
-
     } else {
         stmt->row_count = (int64_t) cursor->affectedRows();
     }
@@ -46,11 +46,13 @@ static int PDOSqlrelayFillStmt(pdo_stmt_t *stmt TSRMLS_DC)
 static int sqlrelayStatementDestructor(pdo_stmt_t *stmt TSRMLS_DC)
 {
 	PDOSqlrelayStatement * sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
-	if (sqlrelayStatement->errorInfo) {
-		freePDOSqlrelayErrorInfo(sqlrelayStatement->errorInfo);
-	}
 
+	if (sqlrelayStatement->errorInfo.msg) {
+		pefree(sqlrelayStatement->errorInfo.msg, stmt->dbh->is_persistent);
+		sqlrelayStatement->errorInfo.msg = NULL;
+	}
 	if (sqlrelayStatement->cursor) {
+		sqlrelayStatement->cursor->closeResultSet();
 		delete sqlrelayStatement->cursor;
 	}
     efree(sqlrelayStatement);
@@ -65,7 +67,9 @@ static int sqlrelayStatementExecute(pdo_stmt_t *stmt TSRMLS_DC)
 	sqlrcursor * cursor = sqlrelayStatement->cursor;
     if (!cursor->executeQuery()) {
     	setSqlrelayStatementError(stmt);
-    	PDOSqlrelayDebugPrint("stmt->error_code %s", stmt->error_code);
+    	if (sqlrelayStatement->handler->debug) {
+    		PDOSqlrelayDebugPrint("stmt->error_code %s", stmt->error_code);
+    	}
         return 0;
     }
     sqlrelayStatement->resultSetId = cursor->getResultSetId();
@@ -157,14 +161,27 @@ static int sqlrelayStatementGetColumnData(pdo_stmt_t *stmt, int colno, char **pt
 static int sqlrelayStatementGetColumnData(pdo_stmt_t *stmt, int colno, char **ptr, size_t *len, int *caller_frees TSRMLS_DC)
 #endif
 {
-
+	struct pdo_column_data *col;
+	int type;
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
 	uint64_t rowNum = 0;
 
 	rowNum = sqlrelayStatement->currentRow;
 	*caller_frees = 1;
+
+	col = &stmt->columns[colno];
+	type = PDO_PARAM_TYPE(col->param_type);
+
 	*len = (unsigned long) sqlrelayStatement->cursor->getFieldLength(rowNum, (uint32_t) colno);
+	const char * result = sqlrelayStatement->cursor->getField(rowNum, (uint32_t) colno);
+
+	if (result == NULL) {
+		*ptr = NULL;
+		return 1;
+	}
+
 	*ptr = estrndup(sqlrelayStatement->cursor->getField(rowNum, (uint32_t) colno), *len);
+
 	if (sqlrelayStatement->handler->debug) {
 		PDOSqlrelayDebugPrint("column data:%s", *ptr);
 	}
@@ -172,11 +189,13 @@ static int sqlrelayStatementGetColumnData(pdo_stmt_t *stmt, int colno, char **pt
 	if (sqlrelayStatement->cursor->errorNumber()) {
 		return 0;
 	}
+
 	return 1;
 }
 
 static int sqlrelayStatementHandlePostBindOut(pdo_stmt_t *stmt, struct pdo_bound_param_data *param, enum pdo_param_event eventType TSRMLS_DC)
 {
+
 	PDOSqlrelayParam * sqlrelayParam = (PDOSqlrelayParam *)param->driver_data;
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
 
@@ -238,16 +257,28 @@ static int sqlrelayStatementHandlePreBindOut(pdo_stmt_t *stmt, struct pdo_bound_
 
 static int sqlrelayStatementHandlePreBindIn(pdo_stmt_t *stmt, struct pdo_bound_param_data *param, enum pdo_param_event eventType TSRMLS_DC)
 {
+
 	PDOSqlrelayParam * sqlrelayParam = (PDOSqlrelayParam *)param->driver_data;
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
-	zval *parameter;
+
+	Z_ISNULL(param->parameter);
 #if PHP_MAJOR_VERSION < 7
+	if (Z_TYPE_P(param->parameter) == IS_NULL) {
+		sqlrelayStatement->cursor->inputBind(sqlrelayParam->bindName,(const char *)NULL);
+		return 1;
+	}
 	parameter = param->parameter;
 #else
-			if (!Z_ISREF(param->parameter))
-				parameter = &param->parameter;
-			else
-				parameter = Z_REFVAL(param->parameter);
+	zval *parameter;
+	if (!Z_ISREF(param->parameter))
+		parameter = &param->parameter;
+	else
+		parameter = Z_REFVAL(param->parameter);
+
+	if (Z_TYPE_P(parameter) == IS_NULL) {
+		sqlrelayStatement->cursor->inputBind(sqlrelayParam->bindName,(const char *)NULL);
+		return 1;
+	}
 #endif
 	switch (PDO_PARAM_TYPE(param->param_type)) {
 	case PDO_PARAM_STMT:
@@ -263,56 +294,82 @@ static int sqlrelayStatementHandlePreBindIn(pdo_stmt_t *stmt, struct pdo_bound_p
 		break;
 
 	case PDO_PARAM_LOB:
-		if (Z_TYPE_P(parameter) == IS_RESOURCE) {
-			php_stream *phpStream;
-			php_stream_from_zval_no_verify(phpStream, &param->parameter);
 
-			if (phpStream) {
 #if PHP_MAJOR_VERSION < 7
+		if (Z_TYPE_P(param->parameter) == IS_RESOURCE) {
+			php_stream *phpStream;
+			php_stream_from_zval_no_verify(stm, &param->parameter);
+			if (phpStream) {
 				SEPARATE_ZVAL_IF_NOT_REF(&param->parameter);
-				Z_TYPE_P(parameter) = IS_STRING;
-				Z_STRLEN_P(parameter) = php_stream_copy_to_mem(phpStream, &Z_STRVAL_P(param->parameter), PHP_STREAM_COPY_ALL, 0);
-#else
-				zend_string *buf = php_stream_copy_to_mem(phpStream, PHP_STREAM_COPY_ALL, 0);
-				zval_ptr_dtor(parameter);
-				ZVAL_STR(parameter, buf ? buf : ZSTR_EMPTY_ALLOC());
-#endif
+				Z_TYPE_P(param->parameter) = IS_STRING;
+				Z_STRLEN_P(param->parameter) = php_stream_copy_to_mem(phpStream, &Z_STRVAL_P(param->parameter), PHP_STREAM_COPY_ALL, 0);
 			} else {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY105", "Expected a stream resource" TSRMLS_CC);
 				return 0;
 			}
-			sqlrelayStatement->cursor->inputBindBlob(sqlrelayParam->bindName, Z_STRVAL_P(parameter), (uint32_t)Z_STRLEN_P(parameter));
-		} else if (Z_TYPE_P(parameter) == IS_STRING) {
-			sqlrelayStatement->cursor->inputBind(sqlrelayParam->bindName, Z_STRVAL_P(parameter), (uint32_t)Z_STRLEN_P(parameter));
+			sqlrelayStatement->cursor->inputBindBlob(sqlrelayParam->bindName, Z_STRVAL_P(param->parameter), (uint32_t)Z_STRLEN_P(param->parameter));
 		}
+#else
+		if (Z_TYPE_P(parameter) == IS_RESOURCE) {
+			php_stream *phpStream = NULL;
+			php_stream_from_zval_no_verify(phpStream, parameter);
+			if (phpStream) {
+				zend_string *mem = php_stream_copy_to_mem(phpStream, PHP_STREAM_COPY_ALL, 0);
+				zval_ptr_dtor(parameter);
+				ZVAL_STR(parameter, mem ? mem : ZSTR_EMPTY_ALLOC());
+			} else {
+				pdo_raise_impl_error(stmt->dbh, stmt, "HY105", "Expected a stream resource");
+				return 0;
+			}
+			sqlrelayStatement->cursor->inputBindBlob(sqlrelayParam->bindName, Z_STRVAL_P(parameter), (uint32_t)Z_STRLEN_P(parameter));
+		}
+#endif
+
 		break;
 
 	case PDO_PARAM_STR:
 	default:
+		/* I dont like this ...... just mark it
+		char * value = Z_STRVAL_P(parameter);
+		bool useBlob = false;
+		for (uint32_t i = 0; i < ((uint32_t)Z_STRLEN_P(parameter)); i++) {
+			if (value[i] == '\0') {
+				useBlob = true;
+				break;
+			}
+		}
+		if (useBlob)
+			sqlrelayStatement->cursor->inputBindBlob(sqlrelayParam->bindName, Z_STRVAL_P(parameter), (uint32_t)Z_STRLEN_P(parameter));
+		else
+		*/
 		sqlrelayStatement->cursor->inputBind(sqlrelayParam->bindName, Z_STRVAL_P(parameter), (uint32_t)Z_STRLEN_P(parameter));
 		break;
 	}
-	PDOSqlrelayDebugPrint("bind %s", sqlrelayParam->bindName);
+	if (sqlrelayStatement->handler->debug) {
+		PDOSqlrelayDebugPrint("bind %s", sqlrelayParam->bindName);
+	}
 	return 1;
 }
 
-
 static int sqlrelayStatementHandleParamEvent(pdo_stmt_t *stmt, struct pdo_bound_param_data *param, enum pdo_param_event eventType TSRMLS_DC)
 {
-
+	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
 	PDOSqlrelayParam * sqlrelayParam;
 	if (PDO_PARAM_TYPE(param->param_type) == PDO_PARAM_STMT)
 		return 0;
 
 	switch (eventType) {
 	case PDO_PARAM_EVT_ALLOC:
-
+		if (param->paramno < 0 || param->paramno >= sqlrelayStatement->numOfParams) {
+			strcpy(stmt->error_code, "HY093");
+			return 0;
+		}
 		sqlrelayParam = (PDOSqlrelayParam*)emalloc(sizeof(PDOSqlrelayParam));
 		sqlrelayParam->bindName = NULL;
 		sqlrelayParam->name = NULL;
 		param->driver_data = sqlrelayParam;
 
-		if (param->name) {
+		if (stmt->supports_placeholders == PDO_PLACEHOLDER_NAMED && param->name) {
 #if PHP_MAJOR_VERSION < 7
 
 		sqlrelayParam->name = estrndup(param->name, param->namelen);
@@ -327,7 +384,7 @@ static int sqlrelayStatementHandleParamEvent(pdo_stmt_t *stmt, struct pdo_bound_
 		else
 			sqlrelayParam->bindName = estrndup(ZSTR_VAL(param->name), ZSTR_LEN(param->name));
 #endif
-		} else {
+		} else if (stmt->supports_placeholders == PDO_PLACEHOLDER_POSITIONAL && param->paramno >= 0) {
 			sqlrelayParam->number = param->paramno;
 			sqlrelayParam->bindName = (char *)emalloc((int)((sqlrelayParam->number + 1) / 10) + 2);
 			sprintf(sqlrelayParam->bindName, "%d", sqlrelayParam->number + 1);
@@ -365,7 +422,6 @@ static int sqlrelayStatementHandleParamEvent(pdo_stmt_t *stmt, struct pdo_bound_
 		break;
 
 	case PDO_PARAM_EVT_FETCH_PRE:
-
 	case PDO_PARAM_EVT_FETCH_POST:
 	case PDO_PARAM_EVT_NORMALIZE:
 
@@ -399,20 +455,22 @@ static int sqlrelayStatementGetColumnMeta(pdo_stmt_t *stmt, long colno, zval *re
 static int sqlrelayStatementGetColumnMeta(pdo_stmt_t *stmt, zend_long colno, zval *returnValue TSRMLS_DC)
 #endif
 {
-    if (colno >= stmt->column_count) {
+    PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
+
+    if (!sqlrelayStatement->done || colno >= stmt->column_count) {
         /* error invalid column */
         return FAILURE;
     }
 
-    PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
-    zval *flags;
     array_init(returnValue);
 #if PHP_MAJOR_VERSION < 7
+    zval *flags;
     MAKE_STD_ZVAL(flags);
+#else
+    zval _flags;
+#define flags &_flags
 #endif
     array_init(flags);
-
-    SQLR_ADD_ASSOC_STRING(returnValue, "native_type", (char *)sqlrelayStatement->cursor->getColumnType((uint32_t)colno), 1);
 
     if (sqlrelayStatement->cursor->getColumnIsPrimaryKey((uint32_t)colno))
     	SQLR_ADD_NEXT_INDEX_STRING(flags, "primary_key", 1);
@@ -420,7 +478,7 @@ static int sqlrelayStatementGetColumnMeta(pdo_stmt_t *stmt, zend_long colno, zva
     if (!sqlrelayStatement->cursor->getColumnIsNullable( (uint32_t)colno))
     	SQLR_ADD_NEXT_INDEX_STRING(flags, "not_null", 1);
 
-    if (!sqlrelayStatement->cursor->getColumnIsPartOfKey((uint32_t)colno))
+    if (sqlrelayStatement->cursor->getColumnIsPartOfKey((uint32_t)colno))
     	SQLR_ADD_NEXT_INDEX_STRING(flags, "multiple_key", 1);
 
     if (sqlrelayStatement->cursor->getColumnIsUnique((uint32_t)colno))
@@ -432,6 +490,7 @@ static int sqlrelayStatementGetColumnMeta(pdo_stmt_t *stmt, zend_long colno, zva
     if (sqlrelayStatement->cursor->getColumnIsAutoIncrement((uint32_t)colno))
     	SQLR_ADD_NEXT_INDEX_STRING(flags, "auto_increment", 1);
 
+    SQLR_ADD_ASSOC_STRING(returnValue, "native_type", (char *)sqlrelayStatement->cursor->getColumnType((uint32_t)colno), 1);
     add_assoc_zval(returnValue, "flags", flags);
 
     return SUCCESS;
@@ -441,6 +500,10 @@ static int sqlrelayStatementGetColumnMeta(pdo_stmt_t *stmt, zend_long colno, zva
 static int sqlrelayStatementCloseResultSet(pdo_stmt_t *stmt TSRMLS_DC)
 {
     PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *)stmt->driver_data;
+	if (sqlrelayStatement->errorInfo.msg) {
+		pefree(sqlrelayStatement->errorInfo.msg, stmt->dbh->is_persistent);
+		sqlrelayStatement->errorInfo.msg = NULL;
+	}
     sqlrcursor *sqlrelayCursor = (sqlrcursor *)sqlrelayStatement->cursor;
     sqlrelayCursor->closeResultSet();
     return 1;

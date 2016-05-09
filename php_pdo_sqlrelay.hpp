@@ -14,6 +14,7 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
+#include  <map>
 
 extern "C" {
 #ifdef HAVE_CONFIG_H
@@ -23,6 +24,7 @@ extern "C" {
 #include "stdio.h"
 #include "php.h"
 #include "php_ini.h"
+#include "ext/standard/php_var.h"
 #include "ext/standard/info.h"
 #include "pdo/php_pdo.h"
 #include "pdo/php_pdo_driver.h"
@@ -56,9 +58,7 @@ extern "C" {
 
 typedef struct PDOSqlrelayErrorInfo
 {
-	char *file;
-	int line;
-	int code;
+	uint64_t code;
 	char *msg;
 };
 
@@ -69,7 +69,7 @@ typedef struct PDOSqlrelayHandler
     char * host;
     uint16_t port;
     char * socket;
-    PDOSqlrelayErrorInfo * errorInfo;
+    PDOSqlrelayErrorInfo errorInfo;
 	int retryTime;
 	int tries;
 	int connectionTimeout;
@@ -84,15 +84,14 @@ typedef struct PDOSqlrelayStatement
 {
 	sqlrcursor * cursor;
 	PDOSqlrelayHandler * handler;
-	PDOSqlrelayErrorInfo * errorInfo;
+	PDOSqlrelayErrorInfo errorInfo;
 	uint64_t resultSetBufferSize;
 	uint16_t resultSetId;
 	int64_t rowCount;
 	uint64_t currentRow;
 	uint64_t firstIndex;
 	enum pdo_fetch_orientation fetchMode;
-	const char * query;
-	long queryLen;
+	uint32_t numOfParams;
 	bool hasBind;
 	bool hasBindout;
 	bool fetched;
@@ -115,10 +114,10 @@ extern struct pdo_stmt_methods PDOSqlrelayStatementMethods;
 /* error handle mocro */
 
 extern int _setPDOSqlrelayHandlerError(pdo_dbh_t *dbh, pdo_stmt_t *stmt, const char *message, const int code, const char * file, int line);
-extern void freePDOSqlrelayErrorInfo(PDOSqlrelayErrorInfo * errorInfo);
 extern void freePDOSqlrelayParam(PDOSqlrelayParam *sqlrelayParam);
 extern int sqlrelayDebugPrint(const char * tpl, ...);
 extern int PDOSqlrelayDebugPrint(const char * tpl, ...);
+extern char * getPDOSqlState(const uint64_t);
 
 
 
