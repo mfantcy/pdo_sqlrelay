@@ -8,3 +8,5 @@ tests/.buildpath
 tests/.settings/org.eclipse.php.core.prefs
 
 tests/.settings/org.eclipse.wst.common.project.facet.core.xml
+
+tests/.DS_Store
