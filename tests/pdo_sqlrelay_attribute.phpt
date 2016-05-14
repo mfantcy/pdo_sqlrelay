@@ -46,15 +46,11 @@ assert($db->getAttribute(PDO::SQLRELAY_ATTR_CURRENT_DB) == $currentDb);
 
 echo "SQLRELAY_ATTR_CONNECT_TIMEOUT\n";
 var_dump($db->setAttribute(PDO::SQLRELAY_ATTR_CONNECT_TIMEOUT, 20));
-assert($db->getAttribute(PDO::SQLRELAY_ATTR_CONNECT_TIMEOUT) == 20);
+assert($db->getAttribute(PDO::SQLRELAY_ATTR_CONNECT_TIMEOUT) == $connectTimeout);
 
 echo "SQLRELAY_ATTR_RESPONSE_TOMEOUT\n";
 var_dump($db->setAttribute(PDO::SQLRELAY_ATTR_RESPONSE_TOMEOUT, $connectTimeout + 1));
 assert($db->getAttribute(PDO::SQLRELAY_ATTR_RESPONSE_TOMEOUT) == $connectTimeout + 1);
-
-echo "SQLRELAY_ATTR_RESPONSE_TOMEOUT\n";
-var_dump($db->setAttribute(PDO::SQLRELAY_ATTR_RESPONSE_TOMEOUT, $responseTimeout + 1));
-assert($db->getAttribute(PDO::SQLRELAY_ATTR_RESPONSE_TOMEOUT) == $responseTimeout + 1);
 
 echo "SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE\n";
 var_dump($db->setAttribute(PDO::SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE, !$useNativeType));
@@ -87,9 +83,7 @@ bool(false)
 SQLRELAY_ATTR_CURRENT_DB
 bool(false)
 SQLRELAY_ATTR_CONNECT_TIMEOUT
-bool(true)
-SQLRELAY_ATTR_RESPONSE_TOMEOUT
-bool(true)
+bool(false)
 SQLRELAY_ATTR_RESPONSE_TOMEOUT
 bool(true)
 SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE

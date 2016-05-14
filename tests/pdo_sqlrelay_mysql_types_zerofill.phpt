@@ -92,6 +92,8 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 	$row = $stmt->fetch(PDO::FETCH_ASSOC);
 	$real_as_float = (false === stristr($row['_mode'], "REAL_AS_FLOAT")) ? false : true;
 
+	$db->setAttribute(PDO::SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE, false);
+	
 	test_type($db, 100, 'REAL ZEROFILL', -1.01, NULL, '/^[0]*0$/');
 	test_type($db, 110, 'REAL ZEROFILL', 1.01, NULL, ($real_as_float) ? '/^[0]*1\.0.*$/' : '/^[0]*1\.01$/');
 	test_type($db, 120, 'REAL UNSIGNED ZEROFILL', 1.01, NULL, ($real_as_float) ? '/^[0]*1\..*$/' : '/^[0]*1\.01$/');
@@ -112,6 +114,29 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 	test_type($db, 230, 'NUMERIC ZEROFILL', 1, NULL, '/^[0]*1$/');
 	test_type($db, 240, 'NUMERIC UNSIGNED ZEROFILL', 1.01, NULL, '/^[0]*1$/');
 
+
+	$db->setAttribute(PDO::SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE, true);
+	
+	test_type($db, 100, 'REAL ZEROFILL', -1.01, NULL, '/^[0]*0$/');
+	test_type($db, 110, 'REAL ZEROFILL', 1.01, NULL, ($real_as_float) ? '/^[0]*1\.0.*$/' : '/^[0]*1\.01$/');
+	test_type($db, 120, 'REAL UNSIGNED ZEROFILL', 1.01, NULL, ($real_as_float) ? '/^[0]*1\..*$/' : '/^[0]*1\.01$/');
+	
+	test_type($db, 130, 'DOUBLE ZEROFILL', -1.01, NULL, '/^[0]*0$/');
+	test_type($db, 140, 'DOUBLE ZEROFILL', 1.01, NULL, '/^[0]*1\.01$/');
+	test_type($db, 150, 'DOUBLE UNSIGNED ZEROFILL', 1.01, NULL, '/^[0]*1\.01$/');
+	
+	test_type($db, 160, 'FLOAT ZEROFILL', -1.01, NULL, '/^[0]*0$/');
+	test_type($db, 170, 'FLOAT ZEROFILL', 1, NULL, '/^[0]*1$/');
+	test_type($db, 180, 'FLOAT UNSIGNED ZEROFILL', -1, NULL, '/^[0]*0$/');
+	
+	test_type($db, 190, 'DECIMAL ZEROFILL', -1.01, NULL, '/^[0]*0$/');
+	test_type($db, 200, 'DECIMAL ZEROFILL', 1.01, NULL, '/^[0]*1$/');
+	test_type($db, 210, 'DECIMAL UNSIGNED ZEROFILL', 1.01, NULL, '/^[0]*1$/');
+	
+	test_type($db, 220, 'NUMERIC ZEROFILL', -1, NULL, '/^[0]*0$/');
+	test_type($db, 230, 'NUMERIC ZEROFILL', 1, NULL, '/^[0]*1$/');
+	test_type($db, 240, 'NUMERIC UNSIGNED ZEROFILL', 1.01, NULL, '/^[0]*1$/');
+	
 	echo "done!\n";
 ?>
 --CLEAN--

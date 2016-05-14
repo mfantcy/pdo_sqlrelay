@@ -328,14 +328,6 @@ static int sqlrelayHandlerSetAttr(pdo_dbh_t *dbh, long attr, zval *val TSRMLS_DC
 		}
 		return 1;
 
-	case PDO_SQLRELAY_ATTR_CONNECT_TIMEOUT:
-		if (sqlrelayHandler->connectionTimeout != ((int) Z_LVAL_P(val))) {
-			sqlrelayHandler->connectionTimeout = (int) Z_LVAL_P(val);
-			sqlrelayHandler->connection->setConnectTimeout(sqlrelayHandler->connectionTimeout, 0);
-			break;
-		}
-		return 1;
-
 	case PDO_SQLRELAY_ATTR_RESPONSE_TOMEOUT:
 		if (sqlrelayHandler->responseTimeout != ((int) Z_LVAL_P(val))) {
 			sqlrelayHandler->responseTimeout = (int32_t) Z_LVAL_P(val);

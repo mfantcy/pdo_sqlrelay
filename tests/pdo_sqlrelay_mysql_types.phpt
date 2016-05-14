@@ -27,6 +27,7 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 		$db->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, false);
 		$stmt = $db->query('SELECT  id, label FROM test');
 		$row = $stmt->fetch(PDO::FETCH_ASSOC);
+		$type = $stmt->getColumnMeta(1);
 		$stmt->closeCursor();
 
 		if (!isset($row['id']) || !isset($row['label'])) {
@@ -41,6 +42,7 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 
 		if (!is_null($pattern)) {
 			if (!preg_match($pattern, $row['label'])) {
+				var_dump($type);
 				printf("[%03d + 5] Value seems wrong, accepting pattern %s got %s, check manually\n",
 					$offset, $pattern, var_export($row['label'], true));
 				return false;
@@ -85,37 +87,41 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 	$db->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, false);
 
 /*
-	test_type($db, 20, 'BIT(8)', 1);
+	
 */
-	$is_mysqlnd = false;
 
-	test_type($db, 30, 'TINYINT', -127, ($is_mysqlnd) ? -127: '-127');
-	test_type($db, 40, 'TINYINT UNSIGNED', 255, ($is_mysqlnd) ? 255 : '255');
-	test_type($db, 50, 'BOOLEAN', 1, ($is_mysqlnd) ? 1 : '1');
+function runTest($db, $useNativeType = false)
+{
+	if($useNativeType) $db->setAttribute(PDO::SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE, true);
+	else $db->setAttribute(PDO::SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE, false);
+	test_type($db, 20, 'BIT(8)', 1);
+	test_type($db, 30, 'TINYINT', -127, ($useNativeType) ? -127: '-127');
+	test_type($db, 40, 'TINYINT UNSIGNED', 255, ($useNativeType) ? 255 : '255');
+	test_type($db, 50, 'BOOLEAN', 1, ($useNativeType) ? 1 : '1');
 
-	test_type($db, 60, 'SMALLINT', -32768, ($is_mysqlnd) ? -32768 : '-32768');
-	test_type($db, 70, 'SMALLINT UNSIGNED', 65535, ($is_mysqlnd) ? 65535 : '65535');
+	test_type($db, 60, 'SMALLINT', -32768, ($useNativeType) ? -32768 : '-32768');
+	test_type($db, 70, 'SMALLINT UNSIGNED', 65535, ($useNativeType) ? 65535 : '65535');
 
-	test_type($db, 80, 'MEDIUMINT', -8388608, ($is_mysqlnd) ? -8388608 : '-8388608');
-	test_type($db, 90, 'MEDIUMINT UNSIGNED', 16777215, ($is_mysqlnd) ? 16777215 : '16777215');
+	test_type($db, 80, 'MEDIUMINT', -8388608, ($useNativeType) ? -8388608 : '-8388608');
+	test_type($db, 90, 'MEDIUMINT UNSIGNED', 16777215, ($useNativeType) ? 16777215 : '16777215');
 
 	test_type($db, 100, 'INT', -2147483648,
-		($is_mysqlnd) ? ((PHP_INT_SIZE > 4) ? (int)-2147483648 : (double)-2147483648) : '-2147483648',
-		NULL, ($is_mysqlnd) ? 'integer' : NULL);
+		($useNativeType) ? ((PHP_INT_SIZE > 4) ? (int)-2147483648 : (double)-2147483648) : '-2147483648',
+		NULL, ($useNativeType) ? 'integer' : NULL);
 
-	test_type($db, 110, 'INT UNSIGNED', 4294967295, ($is_mysqlnd) ? ((PHP_INT_SIZE > 4) ? 4294967295 : '4294967295') : '4294967295');
+	test_type($db, 110, 'INT UNSIGNED', 4294967295, ($useNativeType) ? ((PHP_INT_SIZE > 4) ? 4294967295 : '4294967295') : '4294967295');
 
 	// no chance to return int with the current PDO version - we are forced to return strings
-	test_type($db, 120, 'BIGINT', 1, ($is_mysqlnd) ? 1 : '1');
+	test_type($db, 120, 'BIGINT', 1, ($useNativeType) ? 1 : '1');
 	// to avoid trouble with  numeric ranges, lets pass the numbers as a string
 	test_type($db, 130, 'BIGINT', '-9223372036854775808', NULL, '/^\-9[\.]*22/');
 	test_type($db, 140, 'BIGINT UNSIGNED', '18446744073709551615', NULL, '/^1[\.]*844/');
 
-	test_type($db, 150, 'REAL', -1.01, ($is_mysqlnd) ? -1.01 : '-1.01');
-	test_type($db, 160, 'REAL UNSIGNED', 1.01, ($is_mysqlnd) ? 1.01 : '1.01');
+	test_type($db, 150, 'REAL', -1.01, ($useNativeType) ? -1.01 : '-1.01');
+	test_type($db, 160, 'REAL UNSIGNED', 1.01, ($useNativeType) ? 1.01 : '1.01');
 
-	test_type($db, 170, 'DOUBLE', -1.01, ($is_mysqlnd) ? -1.01 : '-1.01');
-	test_type($db, 180, 'DOUBLE UNSIGNED', 1.01, ($is_mysqlnd) ? 1.01 : '1.01');
+	test_type($db, 170, 'DOUBLE', -1.01, ($useNativeType) ? -1.01 : '-1.01');
+	test_type($db, 180, 'DOUBLE UNSIGNED', 1.01, ($useNativeType) ? 1.01 : '1.01');
 
 	test_type($db, 210, 'FLOAT', -1.01, NULL, '/^\-1.0\d+/');
 	test_type($db, 220, 'FLOAT UNSIGNED', 1.01, NULL, '/^1.0\d+/');
@@ -131,7 +137,7 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 	test_type($db, 340, 'TIME', '14:37:00');
 	test_type($db, 350, 'TIMESTAMP', '2008-05-06 21:09:00');
 	test_type($db, 360, 'DATETIME', '2008-03-23 14:38:00');
-	test_type($db, 370, 'YEAR', 2008, ($is_mysqlnd) ? 2008 : '2008');
+	test_type($db, 370, 'YEAR', 2008, ($useNativeType) ? 2008 : '2008');
 
 	test_type($db, 380, 'CHAR(1)', 'a');
 	test_type($db, 390, 'CHAR(10)', '0123456789');
@@ -166,8 +172,9 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 	test_type($db, 630, "SET('yes', 'no') DEFAULT 'yes'", 'no');
 
 	test_type($db, 640, 'DECIMAL(3,2)', -1.01, '-1.01');
-
-
+}
+	runTest($db, false);
+	runTest($db, true);
 	echo "done!\n";
 ?>
 --CLEAN--

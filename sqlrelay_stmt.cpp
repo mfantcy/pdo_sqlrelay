@@ -156,7 +156,14 @@ static int sqlrelayStatementDescribColumn(pdo_stmt_t *stmt, int colno TSRMLS_DC)
 #endif
     cols[colno].maxlen = sqlrelayStatement->cursor->getColumnLength((uint32_t) colno);
 
-    sqlrelayStatement->columnInfo[colno].phpType = getPHPTypeByNativeType(sqlrelayStatement->cursor->getColumnType((uint32_t) colno));
+    bool isUnsigned = sqlrelayStatement->cursor->getColumnIsUnsigned((uint32_t) colno);
+    const char * sqlrelayType = sqlrelayStatement->cursor->getColumnType((uint32_t) colno);
+
+    if (isUnsigned && strcmp("BIGINT", sqlrelayType) == 0)
+    	sqlrelayStatement->columnInfo[colno].phpType = SQLRELAY_PHP_TYPE_STRING;
+    else
+    	sqlrelayStatement->columnInfo[colno].phpType = getPHPTypeByNativeType(sqlrelayType);
+
     if (sqlrelayStatement->useNativeType){
 		switch (sqlrelayStatement->columnInfo[colno].phpType) {
 		case SQLRELAY_PHP_TYPE_BOOL:
@@ -561,6 +568,7 @@ static int sqlrelayStatementGetColumnMeta(pdo_stmt_t *stmt, zend_long colno, zva
 #define flags &_flags
 #endif
     array_init(flags);
+
     if (sqlrelayStatement->cursor->getColumnIsPrimaryKey((uint32_t)colno))
     	SQLR_ADD_NEXT_INDEX_STRING(flags, "primary_key", 1);
 
@@ -578,6 +586,9 @@ static int sqlrelayStatementGetColumnMeta(pdo_stmt_t *stmt, zend_long colno, zva
 
     if (sqlrelayStatement->cursor->getColumnIsAutoIncrement((uint32_t)colno))
     	SQLR_ADD_NEXT_INDEX_STRING(flags, "auto_increment", 1);
+
+    if (sqlrelayStatement->cursor->getColumnIsUnsigned((uint32_t) colno))
+    	SQLR_ADD_NEXT_INDEX_STRING(flags, "unsigned", 1);
 
     SQLR_ADD_ASSOC_STRING(returnValue, "native_type", (char *)sqlrelayStatement->cursor->getColumnType((uint32_t)colno), 1);
     add_assoc_zval(returnValue, "flags", flags);

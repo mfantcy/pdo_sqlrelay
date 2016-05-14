@@ -1,6 +1,6 @@
 ##Testing PHP PDO SQLRelay
 before you run ```make test```
-You can set the following environment variables to run the tests:
+You can set the following environment variables to run the tests.
 For example:
 
 ```Shell
