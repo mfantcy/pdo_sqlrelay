@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDOStatement->closeCursor()
+PDO SQLRELAY MySQL PDOStatement->closeCursor()
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--

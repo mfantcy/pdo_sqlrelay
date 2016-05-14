@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDO->exec(), affected rows
+PDO SQLRELAY MySQL PDO->exec(), affected rows
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--

@@ -9,12 +9,13 @@
 
 #include "php_pdo_sqlrelay.hpp"
 
-typedef struct PDOSqlrstateInfo
+typedef struct PDOSqlrstateStatePair
 {
 	const int64_t errorNum;
-	pdo_error_type stateStr;
+	const char * stateStr;
 };
-static const struct PDOSqlrstateInfo stateMap[] = {
+
+static const struct PDOSqlrstateStatePair stateMap[] = {
 	{ 1022, "23000"},
 	{ 1037, "HY001"},
 	{ 1038, "HY001"},
@@ -247,6 +248,51 @@ static const struct PDOSqlrstateInfo stateMap[] = {
 	{ 900008, "54011"}
 };
 
+static std::map<const int64_t, const char *> stateStdMap ;
+
+typedef struct PDOSqlrstateTypePair
+{
+	const char * nativeType;
+	const int phpType;
+};
+
+static const struct PDOSqlrstateTypePair typeMap[] = {
+		{ "INT",        SQLRELAY_PHP_TYPE_LONG  },
+		{ "SMALLINT",   SQLRELAY_PHP_TYPE_LONG  },
+		{ "TINYINT",    SQLRELAY_PHP_TYPE_LONG  },
+		{ "USHORT",     SQLRELAY_PHP_TYPE_LONG  },
+		{ "UINT",       SQLRELAY_PHP_TYPE_LONG  },
+		{ "LONGLONG",   SQLRELAY_PHP_TYPE_LONG  },
+		{ "MEDIUMINT",  SQLRELAY_PHP_TYPE_LONG  },
+		{ "NULL",       SQLRELAY_PHP_TYPE_NULL  },
+		{ "BIGINT",     SQLRELAY_PHP_TYPE_LONG  },
+		{ "INTEGER",    SQLRELAY_PHP_TYPE_LONG  },
+		{ "INT64",      SQLRELAY_PHP_TYPE_LONG  },
+		{ "BOOL",       SQLRELAY_PHP_TYPE_BOOL  },
+		{ "BOOLEAN",    SQLRELAY_PHP_TYPE_BOOL  },
+		{ "INT8",       SQLRELAY_PHP_TYPE_LONG  },
+		{ "INT2",       SQLRELAY_PHP_TYPE_LONG  },
+		{ "INT4",       SQLRELAY_PHP_TYPE_LONG  },
+		{ "REAL",       SQLRELAY_PHP_TYPE_DOUBLE},
+		{ "FLOAT",      SQLRELAY_PHP_TYPE_DOUBLE},
+		{ "DOUBLE",     SQLRELAY_PHP_TYPE_DOUBLE},
+		{ "DOUBLE PRECISION", SQLRELAY_PHP_TYPE_DOUBLE},
+		{ "FLOAT4",     SQLRELAY_PHP_TYPE_DOUBLE},
+		{ "FLOAT8",     SQLRELAY_PHP_TYPE_DOUBLE},
+		{ "SMALLFLOAT", SQLRELAY_PHP_TYPE_DOUBLE},
+
+};
+
+struct cmpStr
+{
+   bool operator()(const char *a, const char *b)
+   {
+      return std::strcmp(a, b) < 0;
+   }
+};
+
+static std::map<const char *, const int, cmpStr> typeStdMap;
+
 /* {{{ pdo_sqlrelay_functions[] */
 const zend_function_entry pdo_sqlrelay_functions[] = {
     PHP_FE_END
@@ -280,7 +326,6 @@ ZEND_GET_MODULE(pdo_sqlrelay)
 /* {{{ PHP_MINIT_FUNCTION */
 PHP_MINIT_FUNCTION(pdo_sqlrelay)
 {
-    REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_GET_COLUMN_INFO",         (long)PDO_SQLRELAY_ATTR_GET_COLUMN_INFO);
     REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_DB_TYPE",                 (long)PDO_SQLRELAY_ATTR_DB_TYPE);
     REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_DB_VERSION",              (long)PDO_SQLRELAY_ATTR_DB_VERSION);
     REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_DB_HOST_NAME",            (long)PDO_SQLRELAY_ATTR_DB_HOST_NAME);
@@ -290,6 +335,15 @@ PHP_MINIT_FUNCTION(pdo_sqlrelay)
     REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_CONNECT_TIMEOUT",         (long)PDO_SQLRELAY_ATTR_CONNECT_TIMEOUT);
     REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_RESPONSE_TOMEOUT",        (long)PDO_SQLRELAY_ATTR_RESPONSE_TOMEOUT);
     REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_DEBUG",                   (long)PDO_SQLRELAY_ATTR_DEBUG);
+    REGISTER_PDO_CLASS_CONST_LONG("SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE",  (long)PDO_SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE);
+
+	for (int i = 0; i < sizeof(stateMap)/sizeof(PDOSqlrstateStatePair); i++) {
+		stateStdMap.insert ( std::pair<const int64_t, const char *>(stateMap[i].errorNum, stateMap[i].stateStr) );
+	}
+	for (int i = 0; i < sizeof(typeMap)/sizeof(PDOSqlrstateTypePair); i++) {
+		typeStdMap.insert ( std::pair<const char *, const int>(typeMap[i].nativeType, typeMap[i].phpType) );
+	}
+
     return php_pdo_register_driver(&PDOSqlrelayDriver);
 }
 /* }}} */
@@ -297,6 +351,8 @@ PHP_MINIT_FUNCTION(pdo_sqlrelay)
 /* {{{ PHP_MSHUTDOWN_FUNCTION */
 PHP_MSHUTDOWN_FUNCTION(pdo_sqlrelay)
 {
+	stateStdMap.clear();
+	typeStdMap.clear();
     php_pdo_unregister_driver(&PDOSqlrelayDriver);
     return SUCCESS;
 }
@@ -314,17 +370,30 @@ PHP_MINFO_FUNCTION(pdo_sqlrelay)
 }
 /* }}} */
 
+int getPHPTypeByNativeType(const char *nativeType)
+{
+	int result;
+	std::map<const char *, const int, cmpStr>::iterator it;
+	if (!nativeType)
+		return SQLRELAY_PHP_TYPE_STRING;
+
+	it = typeStdMap.find(nativeType);
+	if (it != typeStdMap.end()) {
+		return it->second;
+	}
+
+	return SQLRELAY_PHP_TYPE_STRING;
+}
+
 char * getPDOSqlState(const uint64_t errorNum)
 {
-	char *result = NULL;
+	std::map<const int64_t, const char *>::iterator it;
 	if (errorNum == 0)
 		return "00000";
-	for (int i = 0; i < sizeof(stateMap)/sizeof(PDOSqlrstateInfo); i++) {
-		if (stateMap[i].errorNum == errorNum)
-			result = (char *)stateMap[i].stateStr;
-	}
-	if(result == NULL) {
-		return "HY000";
-	}
-	return result;
+
+	it = stateStdMap.find(errorNum);
+	if (it != stateStdMap.end())
+		return (char *)it->second;
+
+	return "HY000";
 }

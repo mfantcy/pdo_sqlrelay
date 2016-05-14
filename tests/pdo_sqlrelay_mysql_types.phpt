@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDO->exec(), native types wo ZEROFILL
+PDO SQLRELAY MySQL PDO->exec(), native types wo ZEROFILL
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--

@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDOStatement->bindParam()
+PDO SQLRELAY MySQL PDOStatement->bindParam()
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--
@@ -55,7 +55,6 @@ function pdo_mysql_stmt_bindparam($db, $offset) {
 		printf("[%03d + 5] Cannot execute statement, %s %s\n", $offset,
 			$stmt->errorCode(), var_export($stmt->errorInfo(), true));
 
-	/* NOTE: you cannot use PDO::query() with unbuffered, native PS - see extra test */
 	$stmt = $db->prepare('SELECT id, NULL AS _label FROM test WHERE label IS NULL');
 	$stmt->execute();
 

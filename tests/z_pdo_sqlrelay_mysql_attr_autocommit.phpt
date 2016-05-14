@@ -1,15 +1,11 @@
 --TEST--
-PDO::ATTR_AUTOCOMMIT
+PDO SQLRELAY MYSQL PDO::ATTR_AUTOCOMMIT
 --SKIPIF--
-<?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
+<?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--
 <?php
 include "PDOSqlrelayMysqlTestConfig.inc";
-$dsn = PDOSqlrelayMysqlTestConfig::getPDOSqlrelayDSN();
-$username = PDOSqlrelayMysqlTestConfig::getSqlrelayUser();
-$passwd = PDOSqlrelayMysqlTestConfig::getSqlrelayPassword();
-$options = array(PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION);
-$db = new PDO($dsn, $username, $passwd, $options );
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 
 if (1 !== ($tmp = $db->getAttribute(PDO::ATTR_AUTOCOMMIT)))
 	printf("[001] Expecting int/1 got %s\n", var_export($tmp, true));
@@ -86,11 +82,7 @@ print "done!";
 --CLEAN--
 <?php
 include "PDOSqlrelayMysqlTestConfig.inc";
-$dsn = PDOSqlrelayMysqlTestConfig::getPDOSqlrelayDSN();
-$username = PDOSqlrelayMysqlTestConfig::getSqlrelayUser();
-$passwd = PDOSqlrelayMysqlTestConfig::getSqlrelayPassword();
-$options = array(PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION);
-$db = new PDO($dsn, $username, $passwd, $options );
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 $db->exec('DROP TABLE IF EXISTS test');
 ?>
 --EXPECTF--

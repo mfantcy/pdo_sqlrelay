@@ -14,21 +14,20 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
-#include  <map>
+#include <map>
 
 extern "C" {
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
-#include "stdio.h"
 #include "php.h"
 #include "php_ini.h"
 #include "ext/standard/php_var.h"
 #include "ext/standard/info.h"
 #include "pdo/php_pdo.h"
 #include "pdo/php_pdo_driver.h"
-#include "pdo/php_pdo_error.h"
+#include "zend.h"
 #include "zend_exceptions.h"
 #include "zend_modules.h"
 
@@ -39,22 +38,27 @@ extern "C" {
 }
 #include <sqlrelay/sqlrclient.h>
 
-
 #if PHP_MAJOR_VERSION < 7
 #define SQLR_ZVAL_STRING(a,b,c) ZVAL_STRING(a, b, c)
+#define SQLR_ZVAL_STRINGL(a,b,l,c) ZVAL_STRINGL(a, b, l, c)
 #define SQLR_ADD_NEXT_INDEX_STRING(a,b,c) add_next_index_string(a, b, c)
 #define SQLR_ADD_ASSOC_STRING(a,b,c,d) add_assoc_string(a, b, c, d)
 #define SQLR_Z_ISREF(a) Z_ISREF_P(a)
-#define SQLR_ZVAL_LONG(a, b) ZVAL_LONG(a, b);
 #else
 #define SQLR_ZVAL_STRING(a,b,c) ZVAL_STRING(a, b)
+#define SQLR_ZVAL_STRINGL(a,b,l,c) ZVAL_STRINGL(a, b, l)
 #define SQLR_ADD_NEXT_INDEX_STRING(a,b,c) add_next_index_string(a, b);
 #define SQLR_ADD_ASSOC_STRING(a,b,c,d) add_assoc_string(a, b, c)
 #define SQLR_Z_ISREF(a) Z_ISREF(a)
-#define SQLR_ZVAL_LONG(a, b) ZVAL_LONG(a, b);
 #endif
 
 #define PHP_PDO_SQLRELAY_MODULE_VERSION    "1.0.0"
+
+#define SQLRELAY_PHP_TYPE_NULL 0
+#define SQLRELAY_PHP_TYPE_BOOL 1
+#define SQLRELAY_PHP_TYPE_LONG 2
+#define SQLRELAY_PHP_TYPE_DOUBLE 3
+#define SQLRELAY_PHP_TYPE_STRING 4
 
 typedef struct PDOSqlrelayErrorInfo
 {
@@ -75,16 +79,22 @@ typedef struct PDOSqlrelayHandler
 	int connectionTimeout;
 	int responseTimeout;
 	int authenticationTimeout;
+	bool useNativeType;
     bool debug;
     bool inTnx;
 };
 
+typedef struct PDOSqlrelayColumn
+{
+	int phpType;
+};
 
 typedef struct PDOSqlrelayStatement
 {
 	sqlrcursor * cursor;
 	PDOSqlrelayHandler * handler;
 	PDOSqlrelayErrorInfo errorInfo;
+	PDOSqlrelayColumn * columnInfo;
 	uint64_t resultSetBufferSize;
 	uint16_t resultSetId;
 	int64_t rowCount;
@@ -92,8 +102,9 @@ typedef struct PDOSqlrelayStatement
 	uint64_t firstIndex;
 	enum pdo_fetch_orientation fetchMode;
 	uint32_t numOfParams;
-	bool hasBind;
-	bool hasBindout;
+	uint32_t paramsGiven;
+	char bindMark;
+	bool useNativeType;
 	bool fetched;
 	bool done;
 	bool cursorScroll;
@@ -105,6 +116,9 @@ typedef struct PDOSqlrelayParam
 	long number;
 	char * name;
 	bool bindOut;
+	bool isNull;
+	bool isRef;
+	bool hasBound;
 };
 
 extern pdo_driver_t PDOSqlrelayDriver;
@@ -118,7 +132,7 @@ extern void freePDOSqlrelayParam(PDOSqlrelayParam *sqlrelayParam);
 extern int sqlrelayDebugPrint(const char * tpl, ...);
 extern int PDOSqlrelayDebugPrint(const char * tpl, ...);
 extern char * getPDOSqlState(const uint64_t);
-
+extern int getPHPTypeByNativeType(const char *nativeType);
 
 
 #ifndef __FUNCTION_NAME__
@@ -133,7 +147,6 @@ extern char * getPDOSqlState(const uint64_t);
     #endif
 #endif
 
-
 #define setSqlrelayHandlerError(h) _setPDOSqlrelayHandlerError(h, NULL, NULL, 0, __FILE__, __LINE__)
 #define setSqlrelayHandlerErrorMsg(h, m, c) _setPDOSqlrelayHandlerError(h, NULL, m, c, __FILE__, __LINE__)
 #define setSqlrelayStatementError(s) _setPDOSqlrelayHandlerError(s->dbh, s, NULL, 0, __FILE__, __LINE__)
@@ -144,7 +157,6 @@ extern char * getPDOSqlState(const uint64_t);
 
 enum {
 	PDO_SQLRELAY_ATTR_DEBUG = PDO_ATTR_DRIVER_SPECIFIC,
-	PDO_SQLRELAY_ATTR_GET_COLUMN_INFO,
 	PDO_SQLRELAY_ATTR_DB_TYPE,
 	PDO_SQLRELAY_ATTR_DB_VERSION,
 	PDO_SQLRELAY_ATTR_DB_HOST_NAME,
@@ -153,8 +165,8 @@ enum {
 	PDO_SQLRELAY_ATTR_CURRENT_DB,
 	PDO_SQLRELAY_ATTR_CONNECT_TIMEOUT,
 	PDO_SQLRELAY_ATTR_RESPONSE_TOMEOUT,
+	PDO_SQLRELAY_ATTR_RESULT_USE_NATIVE_TYPE,
 };
-
 
 extern zend_module_entry pdo_sqlrelay_module_entry;
 #define phpext_pdo_sqlrelay_ptr &pdo_sqlrelay_module_entry
@@ -162,7 +174,5 @@ extern zend_module_entry pdo_sqlrelay_module_entry;
 PHP_MINIT_FUNCTION(pdo_sqlrelay);
 PHP_MSHUTDOWN_FUNCTION(pdo_sqlrelay);
 PHP_MINFO_FUNCTION(pdo_sqlrelay);
-
-
 
 #endif	/* PHP_PDO_SQLRELAY_H */

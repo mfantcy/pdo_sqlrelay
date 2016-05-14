@@ -1,5 +1,5 @@
 --TEST--
-MySQL PDO->prepare(), native PS
+PDO SQLRELAY MySQL PDO->prepare()
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--

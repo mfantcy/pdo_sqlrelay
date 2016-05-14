@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDO::rollBack()
+PDO SQLRELAY MySQL PDO::rollBack()
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--

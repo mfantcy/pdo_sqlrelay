@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDOStatement - inserting BLOB from stream
+PDO SQLRELAY MySQL PDOStatement - inserting BLOB from stream
 --SKIPIF--
 <?php
 include "pdo_sqlrelay_mysql_skipif.inc";

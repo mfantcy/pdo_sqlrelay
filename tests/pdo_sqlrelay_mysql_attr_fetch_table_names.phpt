@@ -1,19 +1,12 @@
 --TEST--
-PDO::ATTR_FETCH_TABLE_NAMES
+PDO SQLRELAY PDO::ATTR_FETCH_TABLE_NAMES
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--
 <?php
 include "PDOSqlrelayMysqlTestConfig.inc";
-$dsn = PDOSqlrelayMysqlTestConfig::getPDOSqlrelayDSN();
-$username = PDOSqlrelayMysqlTestConfig::getSqlrelayUser();
-$passwd = PDOSqlrelayMysqlTestConfig::getSqlrelayPassword();
-$options = array(PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION);
-$db = new PDO($dsn, $username, $passwd, $options );
-
-$db->exec('DROP TABLE IF EXISTS test');
-$db->exec('CREATE TABLE test(id INT, label CHAR(1), PRIMARY KEY(id)) ENGINE=' . PDOSqlrelayMysqlTestConfig::getStorageEngin());
-$db->exec("INSERT INTO test(id, label) VALUES (1, 'a'), (2, 'b'), (3, 'c'), (4, 'd'), (5, 'e'), (6, 'f')");
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
+PDOSqlrelayMysqlTestConfig::createTestTable($db);
 
 var_dump($db->setAttribute(PDO::ATTR_FETCH_TABLE_NAMES, 1));
 $stmt = $db->query('SELECT label FROM test LIMIT 1');
@@ -27,6 +20,11 @@ $stmt->closeCursor();
 $db->query("DROP TABLE IF EXISTS test");
 print "done!";
 
+?>
+--CLEAN--
+<?php
+include "PDOSqlrelayMysqlTestConfig.inc";
+PDOSqlrelayMysqlTestConfig::dropTestTable();
 ?>
 --EXPECTF--
 bool(false)

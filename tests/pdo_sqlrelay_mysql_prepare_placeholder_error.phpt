@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDO->prepare(),  PS, placeholder error
+PDO SQLRELAY MySQL PDO->prepare(),  PS, placeholder error
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--

@@ -1,5 +1,5 @@
 --TEST--
-PDO SQLRELAY PDO->beginTransaction()
+PDO SQLRELAY MYSQL PDO->beginTransaction()
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--

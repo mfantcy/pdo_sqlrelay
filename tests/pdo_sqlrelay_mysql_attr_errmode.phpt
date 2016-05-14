@@ -1,17 +1,11 @@
 --TEST--
-PDO::ATTR_ERRMODE
+PDO SQLRELAY PDO::ATTR_ERRMODE
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
---INI--
-error_reporting=E_ALL
 --FILE--
 <?php
 include "PDOSqlrelayMysqlTestConfig.inc";
-$dsn = PDOSqlrelayMysqlTestConfig::getPDOSqlrelayDSN();
-$username = PDOSqlrelayMysqlTestConfig::getSqlrelayUser();
-$passwd = PDOSqlrelayMysqlTestConfig::getSqlrelayPassword();
-$options = null;
-$db = new PDO($dsn, $username, $passwd, $options );
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 
 $valid = array(PDO::ERRMODE_SILENT, PDO::ERRMODE_WARNING, PDO::ERRMODE_EXCEPTION);
 do {

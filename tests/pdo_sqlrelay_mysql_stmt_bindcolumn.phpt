@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDOStatement->bindColumn()
+PDO SQLRELAY MySQL PDOStatement->bindColumn()
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--

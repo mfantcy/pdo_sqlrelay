@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDOStatement->bindValue()
+PDO SQLRELAY MySQL PDOStatement->bindValue()
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--
@@ -8,7 +8,6 @@ include "PDOSqlrelayMysqlTestConfig.inc";
 $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 PDOSqlrelayMysqlTestConfig::createTestTable($db);
 
-printf("Testing native PS...\n");
 try {
 
 	printf("Binding variable...\n");
@@ -145,7 +144,6 @@ try {
 		$e->getMessage(), $db->errorCode(), implode(' ', $db->errorInfo()));
 }
 
-printf("Testing emulated PS...\n");
 try {
 
 	printf("Binding variable...\n");
@@ -290,7 +288,6 @@ include "PDOSqlrelayMysqlTestConfig.inc";
 PDOSqlrelayMysqlTestConfig::dropTestTable();
 ?>
 --EXPECTF--
-Testing native PS...
 Binding variable...
 in = 0 -> id = 1 (integer) / label = 'a' (string)
 in = 0 -> id = 2 (integer) / label = 'b' (string)
@@ -306,7 +303,6 @@ in = 0 -> id = 2 (integer) / label = 'b' (string)
 Binding a variable to two placeholders and changing the variable value in between the binds...
 in = 2 -> id = 1 (integer) / label = 'a' (string)
 in = 2 -> id = 2 (integer) / label = 'b' (string)
-Testing emulated PS...
 Binding variable...
 in = 0 -> id = 1 (integer) / label = 'a' (string)
 in = 0 -> id = 2 (integer) / label = 'b' (string)

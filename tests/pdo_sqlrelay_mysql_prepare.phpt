@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDO->prepare(),  PS
+PDO SQLRELAY MySQL PDO->prepare(),  PS
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--
@@ -37,6 +37,7 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 $db->exec('DROP TABLE IF EXISTS test');
 ?>
 --EXPECTF--
+Warning: PDOStatement::execute(): SQLSTATE[HY093]: Invalid parameter number:%s
 [001] Execute has failed, 'HY093' array (
   0 => 'HY093',
   1 => NULL,

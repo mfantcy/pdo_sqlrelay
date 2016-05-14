@@ -1,16 +1,10 @@
 --TEST--
-MySQL PDOStatement->execute()/fetch(), Non-SELECT
+SQLRELAY MySQL PDOStatement->execute()/fetch(), Non-SELECT
 --SKIPIF--
-<?php
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'skipif.inc');
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
-MySQLPDOTest::skip();
-if (version_compare(PHP_VERSION, '5.0.0', '<'))
-	die("skip Requires PHP 5.0+");
-?>
+<?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--
 <?php
-	require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+include "PDOSqlrelayMysqlTestConfig.inc";
 
 	// No silly strict mode warnings, please!
 	error_reporting(E_ALL^E_STRICT);
@@ -56,7 +50,7 @@ if (version_compare(PHP_VERSION, '5.0.0', '<'))
 
 		}
 
-		$db = new MyPDO(PDO_MYSQL_TEST_DSN, PDO_MYSQL_TEST_USER, PDO_MYSQL_TEST_PASS);
+		$db = new MyPDO(PDOSqlrelayMysqlTestConfig::getPDOSqlrelayDSN(), PDOSqlrelayMysqlTestConfig::getSqlrelayUser(), PDOSqlrelayMysqlTestConfig::getSqlrelayPassword());
 		$db->exec('DROP TABLE IF EXISTS test');
 		$db->exec('CREATE TABLE test(id INT)');
 		$db->exec('INSERT INTO test(id) VALUES (1), (2)');
@@ -76,8 +70,8 @@ if (version_compare(PHP_VERSION, '5.0.0', '<'))
 ?>
 --CLEAN--
 <?php
-require dirname(__FILE__) . '/mysql_pdo_test.inc';
-$db = MySQLPDOTest::factory();
+include "PDOSqlrelayMysqlTestConfig.inc";
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 $db->exec('DROP TABLE IF EXISTS test');
 ?>
 --EXPECTF--

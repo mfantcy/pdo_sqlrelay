@@ -1,15 +1,11 @@
 --TEST--
-PDO::ATTR_SERVER_VERSION
+PDO SQLRELAY PDO::ATTR_SERVER_VERSION
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--
 <?php
 include "PDOSqlrelayMysqlTestConfig.inc";
-$dsn = PDOSqlrelayMysqlTestConfig::getPDOSqlrelayDSN();
-$username = PDOSqlrelayMysqlTestConfig::getSqlrelayUser();
-$passwd = PDOSqlrelayMysqlTestConfig::getSqlrelayPassword();
-$options = array(PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION);
-$db = new PDO($dsn, $username, $passwd, $options );
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 
 assert(('' == $db->errorCode()) || ('00000' == $db->errorCode()));
 

@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL PDO->__construct(), PDO::ATTR_PERSISTENT
+PDO SQLRELAY MySQL PDO->__construct(), PDO::ATTR_PERSISTENT
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--

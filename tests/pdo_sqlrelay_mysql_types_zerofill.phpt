@@ -1,19 +1,16 @@
 --TEST--
-MySQL PDO->exec(), native types - ZEROFILL
+PDO SQLRELAY MySQL PDO->exec(), native types - ZEROFILL
 --SKIPIF--
-<?php
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'skipif.inc');
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
-MySQLPDOTest::skip();
-?>
+<?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--
 <?php
-	require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+include "PDOSqlrelayMysqlTestConfig.inc";
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 
 	function test_type(&$db, $offset, $sql_type, $value, $ret_value = NULL, $pattern = NULL) {
 
 		$db->exec('DROP TABLE IF EXISTS test');
-		$sql = sprintf('CREATE TABLE test(id INT, label %s) ENGINE=%s', $sql_type, MySQLPDOTest::getTableEngine());
+		$sql = sprintf('CREATE TABLE test(id INT, label %s) ENGINE=%s', $sql_type, PDOSqlrelayMysqlTestConfig::getStorageEngin());
 		@$db->exec($sql);
 		if ($db->errorCode() != 0) {
 			// not all MySQL Server versions and/or engines might support the type
@@ -86,7 +83,6 @@ MySQLPDOTest::skip();
 		return true;
 	}
 
-	$db = MySQLPDOTest::factory();
 	$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 	$db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 	$db->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, false);
@@ -120,8 +116,8 @@ MySQLPDOTest::skip();
 ?>
 --CLEAN--
 <?php
-require dirname(__FILE__) . '/mysql_pdo_test.inc';
-$db = MySQLPDOTest::factory();
+include "PDOSqlrelayMysqlTestConfig.inc";
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 $db->exec('DROP TABLE IF EXISTS test');
 ?>
 --EXPECTF--

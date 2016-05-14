@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY MySQL Prepared Statements and BLOBs
+PDO SQLRELAY MySQL Prepared Statements and BLOBs
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc";?>
 --FILE--
@@ -10,8 +10,8 @@ $db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 $blobs = array(
 	'TINYBLOB'		=> 255,
 	'TINYTEXT'		=> 255,
-	'BLOB'				=> 32767,
-	'TEXT'				=> 32767,
+	'BLOB'			=> 32767,
+	'TEXT'			=> 32767,
 	'MEDIUMBLOB'	=> 100000,
 	'MEDIUMTEXT'	=> 100000,
 	'LONGBLOB'		=> 100000,

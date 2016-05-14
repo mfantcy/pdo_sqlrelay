@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY PDO MySQL Describe table enum
+PDO SQLRELAY PDO MySQL Describe table enum
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--

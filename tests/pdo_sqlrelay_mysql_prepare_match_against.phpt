@@ -1,5 +1,5 @@
 --TEST--
-SQLRELAY (bindParam() and bindValue() do not work with MySQL MATCH () AGAINST ())
+PDO SQLRELAY (bindParam() and bindValue() do not work with MySQL MATCH () AGAINST ())
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"?>
 --FILE--

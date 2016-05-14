@@ -1,5 +1,5 @@
 --TEST--
-PDO::ATTR_CONNECTION_STATUS
+PDO SQLRELAY PDO::ATTR_CONNECTION_STATUS
 --SKIPIF--
 <?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
 --FILE--

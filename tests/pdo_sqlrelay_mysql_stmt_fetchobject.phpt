@@ -1,12 +1,9 @@
 --TEST--
-MySQL PDO: PDOStatement->fetchObject()
+PDO SQLRELAY MySQL PDO: PDOStatement->fetchObject()
 --SKIPIF--
-<?php
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'skipif.inc');
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
-MySQLPDOTest::skip();
-$db = MySQLPDOTest::factory();
-
+<?php include "pdo_sqlrelay_mysql_skipif.inc";
+include "PDOSqlrelayMysqlTestConfig.inc";
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory(true);
 try {
 	$query = "SELECT '', NULL, \"\" FROM DUAL";
 	$stmt = $db->prepare($query);
@@ -19,9 +16,9 @@ if (!$ok)
 ?>
 --FILE--
 <?php
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
-$db = MySQLPDOTest::factory();
-MySQLPDOTest::createTestTable($db);
+include "PDOSqlrelayMysqlTestConfig.inc";
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
+PDOSqlrelayMysqlTestConfig::createTestTable($db);
 
 try {
 
@@ -77,23 +74,23 @@ print "done!";
 ?>
 --CLEAN--
 <?php
-require dirname(__FILE__) . '/mysql_pdo_test.inc';
+include "PDOSqlrelayMysqlTestConfig.inc";
 MySQLPDOTest::dropTestTable();
 ?>
 --EXPECTF--
 myclass::__set(id, -'1'-) 1
 myclass::__set(, -''-) 2
-myclass::__set(null, -NULL-) 3
+myclass::__set(NULL, -NULL-) 3
 myclass::__set(, -''-) 4
 myclass::__construct(0, 1): 4 / 4
 myclass::__set(id, -'2'-) 1
 myclass::__set(, -''-) 2
-myclass::__set(null, -NULL-) 3
+myclass::__set(NULL, -NULL-) 3
 myclass::__set(, -''-) 4
 myclass::__construct(1, 2): 8 / 4
 myclass::__set(id, -'3'-) 1
 myclass::__set(, -''-) 2
-myclass::__set(null, -NULL-) 3
+myclass::__set(NULL, -NULL-) 3
 myclass::__set(, -''-) 4
 myclass::__construct(2, 3): 12 / 4
 object(myclass)#%d (4) {
@@ -103,7 +100,7 @@ object(myclass)#%d (4) {
   NULL
   [%u|b%"id"]=>
   %unicode|string%(1) "3"
-  [%u|b%"null"]=>
+  [%u|b%"NULL"]=>
   NULL
 }
 done!

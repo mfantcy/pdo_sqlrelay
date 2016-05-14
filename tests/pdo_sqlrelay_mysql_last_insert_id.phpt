@@ -1,15 +1,11 @@
 --TEST--
 PDO SQLRELAY MySQL auto_increment / last insert id
 --SKIPIF--
-<?php include "pdo_sqlrelay_mysql_skipif.inc"; ?>
+<?php include "pdo_sqlrelay_mysql_skipif.inc";?>
 --FILE--
 <?php
 include "PDOSqlrelayMysqlTestConfig.inc";
-$dsn = PDOSqlrelayMysqlTestConfig::getPDOSqlrelayDSN();
-$username = PDOSqlrelayMysqlTestConfig::getSqlrelayUser();
-$passwd = PDOSqlrelayMysqlTestConfig::getSqlrelayPassword();
-$options = array(PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION);
-$db = new PDO($dsn, $username, $passwd, $options );
+$db = PDOSqlrelayMysqlTestConfig::PDOFactory();
 
 $db->query("DROP TABLE IF EXISTS test");
 
