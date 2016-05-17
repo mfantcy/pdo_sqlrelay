@@ -159,10 +159,7 @@ static int sqlrelayStatementDescribColumn(pdo_stmt_t *stmt, int colno TSRMLS_DC)
     bool isUnsigned = sqlrelayStatement->cursor->getColumnIsUnsigned((uint32_t) colno);
     const char * sqlrelayType = sqlrelayStatement->cursor->getColumnType((uint32_t) colno);
 
-    if (isUnsigned && strcmp("BIGINT", sqlrelayType) == 0)
-    	sqlrelayStatement->columnInfo[colno].phpType = SQLRELAY_PHP_TYPE_STRING;
-    else
-    	sqlrelayStatement->columnInfo[colno].phpType = getPHPTypeByNativeType(sqlrelayType);
+    sqlrelayStatement->columnInfo[colno].phpType = getPHPTypeByNativeType(sqlrelayType);
 
     if (sqlrelayStatement->useNativeType){
 		switch (sqlrelayStatement->columnInfo[colno].phpType) {
@@ -173,7 +170,21 @@ static int sqlrelayStatementDescribColumn(pdo_stmt_t *stmt, int colno TSRMLS_DC)
 			cols[colno].param_type = PDO_PARAM_ZVAL;
 			break;
 		case SQLRELAY_PHP_TYPE_LONG:
-			cols[colno].param_type = PDO_PARAM_INT;
+#if SIZEOF_LONG == 4
+			if (strcmp("BIGINT", sqlrelayType) == 0
+					|| strcmp("INT64", sqlrelayType) == 0
+					|| strcmp("LONGLONG", sqlrelayType) == 0
+					|| strcmp("UINT", sqlrelayType) == 0
+					|| ((strcmp("INT", sqlrelayType) == 0 || strcmp("INTEGER", sqlrelayType) == 0) && isUnsigned))
+#else
+			if ((strcmp("BIGINT", sqlrelayType) == 0
+					|| strcmp("INT64", sqlrelayType) == 0
+					|| strcmp("LONGLONG", sqlrelayType) == 0)
+					&& isUnsigned)
+#endif
+				cols[colno].param_type = PDO_PARAM_STR;
+			else
+				cols[colno].param_type = PDO_PARAM_INT;
 			break;
 		case SQLRELAY_PHP_TYPE_NULL:
 			cols[colno].param_type = PDO_PARAM_NULL;
