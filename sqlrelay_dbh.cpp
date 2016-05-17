@@ -191,6 +191,7 @@ static int sqlrelayHandlerPrepare(
 
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement*) ecalloc(1, sizeof(PDOSqlrelayStatement));
 	sqlrelayStatement->columnInfo = NULL;
+	sqlrelayStatement->countLessParam = true;
 	stmt->driver_data = sqlrelayStatement;
 	stmt->methods = &PDOSqlrelayStatementMethods;
 
@@ -210,6 +211,7 @@ static int sqlrelayHandlerPrepare(
 		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
 	} else if (strncmp("$", bindFormat, 1) == 0) { /* for postgresql */
 		sqlrelayStatement->bindMark = '$';
+		sqlrelayStatement->countLessParam = false;
 		stmt->named_rewrite_template = "$%d";
 		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
 	} else if (strncmp("@", bindFormat, 1) == 0) {

@@ -110,6 +110,7 @@ typedef struct PDOSqlrelayStatement
 	uint32_t numOfParams;
 	uint32_t paramsGiven;
 	char bindMark;
+	bool countLessParam;
 	bool useNativeType;
 	bool fetched;
 	bool done;

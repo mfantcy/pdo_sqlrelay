@@ -30,7 +30,7 @@ class PDOSqlrelayPostgresqlTestConfig
 <user user="pgsqltest" password="pgsqltest"/>
 </users>
 <connections>
-<connection string="user=--PDO_SQLRELAY_DB_USER--;password=--PDO_SQLRELAY_DB_PW--;host=--PDO_SQLRELAY_DB_HOST--;port=--PDO_SQLRELAY_DB_PORT--;db=--PDO_SQLRELAY_DB_DBNAME--;debug=no"/>
+<connection string="typemangling=yes;user=--PDO_SQLRELAY_DB_USER--;password=--PDO_SQLRELAY_DB_PW--;host=--PDO_SQLRELAY_DB_HOST--;port=--PDO_SQLRELAY_DB_PORT--;db=--PDO_SQLRELAY_DB_DBNAME--;debug=no"/>
 </connections>
 </instance>
 </instances>

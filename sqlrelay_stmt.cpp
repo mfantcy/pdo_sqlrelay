@@ -73,7 +73,7 @@ static int sqlrelayStatementExecute(pdo_stmt_t *stmt TSRMLS_DC)
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
 	sqlrcursor * cursor = sqlrelayStatement->cursor;
 
-	if (sqlrelayStatement->paramsGiven < sqlrelayStatement->numOfParams) {
+	if (sqlrelayStatement->countLessParam && sqlrelayStatement->paramsGiven < sqlrelayStatement->numOfParams) {
 		setSqlrelayStatementErrorMsg(stmt, "Too few parameters bound", 2031); //"HY093"
 		return 0;
 	}
@@ -150,7 +150,7 @@ static int sqlrelayStatementDescribColumn(pdo_stmt_t *stmt, int colno TSRMLS_DC)
     const char *name = sqlrelayStatement->cursor->getColumnName((uint32_t) colno);
 #if PHP_MAJOR_VERSION < 7
     cols[colno].namelen = strlen(name);
-    cols[colno].name = estrndup(name,cols[colno].namelen);
+    cols[colno].name = estrdup(name);
 #else
     cols[colno].name = zend_string_init(name, strlen(name), 0);
 #endif
@@ -201,7 +201,6 @@ static int sqlrelayStatementGetColumnData(pdo_stmt_t *stmt, int colno, char **pt
     if (colno >= stmt->column_count) {
         return 0;
     }
-
 	struct pdo_column_data *col;
 	int type, phpType;
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement *) stmt->driver_data;
@@ -247,7 +246,11 @@ static int sqlrelayStatementGetColumnData(pdo_stmt_t *stmt, int colno, char **pt
 			case PDO_PARAM_BOOL:
 				zend_bool *boolResult;
 				boolResult = (zend_bool *)emalloc(sizeof(zend_bool));
-				*boolResult = (sqlrelayStatement->cursor->getFieldAsInteger(rowNum, (uint32_t) colno) == 0) ? 1: 0;
+				if (strcmp("postgresql", sqlrelayStatement->handler->identify) == 0) { //postgresql
+					*boolResult = strncmp(result, "f", sqlrelayStatement->cursor->getFieldLength(rowNum, (uint32_t) colno)) == 0 ? 0 : 1;
+				} else {
+					*boolResult = (sqlrelayStatement->cursor->getFieldAsInteger(rowNum, (uint32_t) colno) == 0) ? 0: 1;
+				}
 				*ptr = (char *)boolResult;
 				*len = sizeof(zend_bool);
 				break;
@@ -374,6 +377,7 @@ static int sqlrelayStatementHandlePreBindIn(pdo_stmt_t *stmt, struct pdo_bound_p
 #if PHP_MAJOR_VERSION < 7
 		value = (Z_BVAL_P(parameter)) ? 1 : 0;
 #else
+		convert_to_boolean(parameter);
 		value = (Z_TYPE_P(parameter) == IS_TRUE) ? 1 : 0;
 #endif
 		sqlrelayStatement->cursor->inputBind(sqlrelayParam->bindName, value);
@@ -392,9 +396,15 @@ static int sqlrelayStatementHandlePreBindIn(pdo_stmt_t *stmt, struct pdo_bound_p
 			php_stream *phpStream;
 			php_stream_from_zval_no_verify(phpStream, &param->parameter);
 			if (phpStream) {
+				size_t len;
 				SEPARATE_ZVAL_IF_NOT_REF(&param->parameter);
 				Z_TYPE_P(param->parameter) = IS_STRING;
-				Z_STRLEN_P(param->parameter) = php_stream_copy_to_mem(phpStream, &Z_STRVAL_P(param->parameter), PHP_STREAM_COPY_ALL, 0);
+				if ((len = php_stream_copy_to_mem(phpStream, &Z_STRVAL_P(param->parameter), PHP_STREAM_COPY_ALL, 0)) > 0) {
+					Z_STRLEN_P(param->parameter) = len;
+				} else {
+					ZVAL_EMPTY_STRING(param->parameter);
+				}
+
 			} else {
 				pdo_raise_impl_error(stmt->dbh, stmt, "HY105", "Expected a stream resource" TSRMLS_CC);
 				return 0;
@@ -416,7 +426,6 @@ static int sqlrelayStatementHandlePreBindIn(pdo_stmt_t *stmt, struct pdo_bound_p
 			sqlrelayStatement->cursor->inputBindBlob(sqlrelayParam->bindName, Z_STRVAL_P(parameter), (uint32_t)Z_STRLEN_P(parameter));
 		}
 #endif
-		break;
 
 	case PDO_PARAM_STR:
 	default:
@@ -464,31 +473,32 @@ static int sqlrelayStatementParamHook(pdo_stmt_t *stmt, struct pdo_bound_param_d
 			sqlrelayParam->bindName = NULL;
 			sqlrelayParam->name = NULL;
 			param->driver_data = sqlrelayParam;
+			char tmp[200];
 			if (stmt->supports_placeholders == PDO_PLACEHOLDER_NAMED) {
 				if (param->name) {
-					sqlrelayParam->name = estrndup((char *)SQLR_PARAM_NAME_VAL(param->name), SQLR_PARAM_NAME_LEN(param->name));
-					if (SQLR_PARAM_NAME_VAL(param->name)[0] == ':' || SQLR_PARAM_NAME_VAL(param->name)[0] == '$' || SQLR_PARAM_NAME_VAL(param->name)[0] == '@') {
-						if (stmt->bound_param_map != NULL && zend_hash_num_elements(stmt->bound_param_map) > 0) {
-							char *tmp;
-							if (SUCCESS == SQLR_PARAM_ZHASH_FIND(stmt->bound_param_map, param->name, tmp)) {
-								sqlrelayParam->bindName = estrdup(tmp + 1);
-								efree(tmp);
-							} else {
-								pdo_raise_impl_error(stmt->dbh, stmt, "HY093", SQLR_PARAM_NAME_VAL(param->name) TSRMLS_CC);
-								return 0;
-							}
-						} else {
-							sqlrelayParam->bindName = estrndup(SQLR_PARAM_NAME_VAL(param->name) + 1, SQLR_PARAM_NAME_LEN(param->name) - 1);
+					if (stmt->bound_param_map != NULL && zend_hash_num_elements(stmt->bound_param_map) > 0) {
+						char * tmp2;
+						if (FAILURE == SQLR_PARAM_ZHASH_FIND(stmt->bound_param_map, param->name, tmp2)) {
+							pdo_raise_impl_error(stmt->dbh, stmt, "HY093", SQLR_PARAM_NAME_VAL(param->name) TSRMLS_CC);
+							return 0;
 						}
+						memcpy(tmp, tmp2, strlen(tmp2));
+						tmp[strlen(tmp2)] = '\0';
 					} else {
-						sqlrelayParam->bindName = estrndup(SQLR_PARAM_NAME_VAL(param->name), SQLR_PARAM_NAME_LEN(param->name));
+						memcpy(tmp, SQLR_PARAM_NAME_VAL(param->name), SQLR_PARAM_NAME_LEN(param->name));
+						tmp[SQLR_PARAM_NAME_LEN(param->name)] ='\0';
 					}
-
 				} else if (param->paramno >= 0 ) {
 					const char * tmplate = stmt->named_rewrite_template ? stmt->named_rewrite_template : ":pdo%d";
-					char tmp[200];
 					sqlrelayParam->number = param->paramno;
 					sprintf(tmp, tmplate, sqlrelayParam->number + 1);
+
+				} else {
+					return 0;
+				}
+				if (tmp[0] == ':' || tmp[0] == '$' || tmp[0] == '@') {
+					sqlrelayParam->bindName = estrndup(tmp + 1, strlen(tmp) - 1);
+				} else {
 					sqlrelayParam->bindName = estrndup(tmp, strlen(tmp));
 				}
 			} else if (stmt->supports_placeholders == PDO_PLACEHOLDER_POSITIONAL) {
@@ -497,8 +507,8 @@ static int sqlrelayStatementParamHook(pdo_stmt_t *stmt, struct pdo_bound_param_d
 					return 0;
 				}
 				sqlrelayParam->number = param->paramno;
-				sqlrelayParam->bindName = (char *)emalloc((int)((param->paramno + 1) / 10) + 2);
-				sprintf(sqlrelayParam->bindName, "%d", sqlrelayParam->number + 1);
+				sprintf(tmp, "%d", sqlrelayParam->number + 1);
+				sqlrelayParam->bindName = estrdup(tmp);
 			}
 
 //			if (stmt->supports_placeholders == PDO_PLACEHOLDER_NAMED && param->name) {
