@@ -1,4 +1,4 @@
 ####MySQL TEST
-[Test PDO SQLRELAY](./mysql/README.md)
+[Test PDO SQLRELAY MySQL](./mysql/README.md)
 ####Postgresql TEST
-[Test PDO SQLRELAY](./postgresql/README.md)
+[Test PDO SQLRELAY Postgresql](./postgresql/README.md)
