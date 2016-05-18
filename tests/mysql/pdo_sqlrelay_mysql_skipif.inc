@@ -16,4 +16,4 @@ try {
 }
 $dbType = $pdo->getAttribute(PDO::SQLRELAY_ATTR_DB_TYPE);
 if ($dbType != "mysql")
-	die ("skip DB type is not mysql");
+	die ("skip DB type is not mysql ,'".$dbType."' got");

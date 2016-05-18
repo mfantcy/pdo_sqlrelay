@@ -144,7 +144,7 @@ FEOF;
 	static public function stopSqlrelayDaemon()
 	{
 		self::envToConf();
-		$cionfFile = self::getConfigPath();
+		$confFile = self::getConfigPath();
 		$stopCommand = "PATH=".self::$configArray["PDO_SQLRELAY_LOCAL_BIN_PATH"]." sqlr-stop -id mysqlrelaytest -config {$confFile} > /dev/null 2>&1 &";
 		exec($stopCommand, $out, $outVar);
 	}

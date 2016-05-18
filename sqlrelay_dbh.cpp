@@ -98,7 +98,7 @@ static bool isCharInStr(char * search, const char * string)
 	return ret;
 }
 
-static uint32_t countPositionalParamNum(char bindMark, const char * query, uint32_t queryLen) {
+static uint32_t countParamNum(char bindMark, const char * query, uint32_t queryLen) {
 	//mysql Comment /* */
 	uint32_t paramCount = 0;
 	bool inComment = false;
@@ -191,6 +191,7 @@ static int sqlrelayHandlerPrepare(
 
 	PDOSqlrelayStatement *sqlrelayStatement = (PDOSqlrelayStatement*) ecalloc(1, sizeof(PDOSqlrelayStatement));
 	sqlrelayStatement->columnInfo = NULL;
+	sqlrelayStatement->countLessParam = true;
 	stmt->driver_data = sqlrelayStatement;
 	stmt->methods = &PDOSqlrelayStatementMethods;
 
@@ -202,17 +203,20 @@ static int sqlrelayHandlerPrepare(
 
 	const char * bindFormat = sqlrelayHandler->connection->bindFormat();
 	sqlrelayStatement->bindMark = 0;
-	if (strcmp("?", bindFormat) == 0) {
-		sqlrelayStatement->bindMark = '?';
+	if (strncmp("?", bindFormat, 1) == 0) {
+		sqlrelayStatement->bindMark = '?'; /* for mysql */
 		stmt->supports_placeholders = PDO_PLACEHOLDER_POSITIONAL;
-	} else if (strcmp(":", bindFormat) == 0) {
+	} else if (strncmp(":", bindFormat, 1) == 0) {
 		sqlrelayStatement->bindMark = ':';
 		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
-	} else if (strcmp("$", bindFormat) == 0) {
+	} else if (strncmp("$", bindFormat, 1) == 0) { /* for postgresql */
 		sqlrelayStatement->bindMark = '$';
+		sqlrelayStatement->countLessParam = false;
+		stmt->named_rewrite_template = "$%d";
 		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
-	} else if (strcmp("@", bindFormat) == 0) {
+	} else if (strncmp("@", bindFormat, 1) == 0) {
 		sqlrelayStatement->bindMark = '@';
+		stmt->named_rewrite_template = "@pdo%d";
 		stmt->supports_placeholders = PDO_PLACEHOLDER_NAMED;
 	} else {
 		stmt->supports_placeholders = PDO_PLACEHOLDER_NONE;
@@ -245,8 +249,7 @@ static int sqlrelayHandlerPrepare(
 		strcpy(dbh->error_code, stmt->error_code);
 		return 0;
 	}
-
-	sqlrelayStatement->numOfParams = (uint32_t) countPositionalParamNum(sqlrelayStatement->bindMark, sql, sqlLen);
+	sqlrelayStatement->numOfParams = (uint32_t) countParamNum(sqlrelayStatement->bindMark, sql, sqlLen);
 	sqlrelayCursor->prepareQuery(sql, sqlLen);
 
 	if (nsql) {

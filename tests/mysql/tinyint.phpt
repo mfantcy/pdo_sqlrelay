@@ -29,7 +29,7 @@ try {
 	$stmt = $db->prepare('SELECT id, ty FROM test');
 	$stmt->execute();
 	var_dump($stmt->fetchAll(PDO::FETCH_ASSOC));
-
+	
 } catch (PDOException $e) {
 	printf("[001] %s [%s] %s\n",
 		$e->getMessage(), $db->errorCode(), implode(' ', $db->errorInfo()));

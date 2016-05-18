@@ -44,15 +44,21 @@ extern "C" {
 #define SQLR_ADD_NEXT_INDEX_STRING(a,b,c) add_next_index_string(a, b, c)
 #define SQLR_ADD_ASSOC_STRING(a,b,c,d) add_assoc_string(a, b, c, d)
 #define SQLR_Z_ISREF(a) Z_ISREF_P(a)
+#define SQLR_PARAM_NAME_VAL(a) a
+#define SQLR_PARAM_NAME_LEN(a) a##len
+#define SQLR_PARAM_ZHASH_FIND(ht,n,pt) zend_hash_find(ht, n, n##len + 1, (void**)&pt)
 #else
 #define SQLR_ZVAL_STRING(a,b,c) ZVAL_STRING(a, b)
 #define SQLR_ZVAL_STRINGL(a,b,l,c) ZVAL_STRINGL(a, b, l)
 #define SQLR_ADD_NEXT_INDEX_STRING(a,b,c) add_next_index_string(a, b);
 #define SQLR_ADD_ASSOC_STRING(a,b,c,d) add_assoc_string(a, b, c)
 #define SQLR_Z_ISREF(a) Z_ISREF(a)
+#define SQLR_PARAM_NAME_VAL(a) ZSTR_VAL(a)
+#define SQLR_PARAM_NAME_LEN(a) ZSTR_LEN(a)
+#define SQLR_PARAM_ZHASH_FIND(ht,n,pt) ((pt = (char *)zend_hash_find_ptr(ht, n)) == NULL ? FAILURE : SUCCESS)
 #endif
 
-#define PHP_PDO_SQLRELAY_MODULE_VERSION    "1.0.0"
+#define PHP_PDO_SQLRELAY_MODULE_VERSION    "1.0.1"
 
 #define SQLRELAY_PHP_TYPE_NULL 0
 #define SQLRELAY_PHP_TYPE_BOOL 1
@@ -104,6 +110,7 @@ typedef struct PDOSqlrelayStatement
 	uint32_t numOfParams;
 	uint32_t paramsGiven;
 	char bindMark;
+	bool countLessParam;
 	bool useNativeType;
 	bool fetched;
 	bool done;
