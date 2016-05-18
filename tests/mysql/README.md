@@ -1,5 +1,10 @@
-##Testing PHP PDO SQLRelay
+##Testing PHP PDO SQLRelay MySQL
 before you run ```make test```
+sqlrelay config suggestion
+
+*````instances/instance```` tag set attribute ````fakeinputbindvariables="no"````
+*````connections/connection```` mysql databases, the connect string ````fakebinds=no````  don't Overrides ````identity````
+
 You can set the following environment variables to run the tests.
 For example:
 

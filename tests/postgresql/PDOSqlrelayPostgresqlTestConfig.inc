@@ -7,16 +7,15 @@ class PDOSqlrelayPostgresqlTestConfig
 		'PDO_SQLRELAY_USE_LOCAL' => 'y',
 		// if PDO_SQLRELAY_USE_LOCAL == "y"
 		'PDO_SQLRELAY_LOCAL_BIN_PATH' => '/usr/local/firstworks/bin',
-		'PDO_SQLRELAY_DB_SOCKET'   => '',
 		'PDO_SQLRELAY_DB_HOST'   => 'localhost',
 		'PDO_SQLRELAY_DB_PORT'   => '5432',
 		'PDO_SQLRELAY_DB_USER'   => 'postgres',
-		'PDO_SQLRELAY_DB_PW'     => '12345',
+		'PDO_SQLRELAY_DB_PW'     => '',
 		// if PDO_SQLRELAY_USE_LOCAL != "n"
 		'PDO_SQLRELAY_DSN'       => '',
 		'PDO_SQLRELAY_SOCKET'    => '/tmp/sqlrelaypgsqltest.socket',
 		'PDO_SQLRELAY_HOST'      => 'localhost',
-		'PDO_SQLRELAY_PORT'      => '90001',
+		'PDO_SQLRELAY_PORT'      => '90000',
 		'PDO_SQLRELAY_USER'      => 'pgsqltest',
 		'PDO_SQLRELAY_PW'        => 'pgsqltest',
 		//database name or schema
@@ -50,22 +49,18 @@ FEOF;
 		self::$configArray['PDO_SQLRELAY_LOCAL_BIN_PATH'] 
 			= getenv('SQRPGSQL_LOCAL_BIN') ? getenv('SQRPGSQL_LOCAL_BIN') : self::$configArray['PDO_SQLRELAY_LOCAL_BIN_PATH'];
 		
-		self::$configArray['PDO_SQLRELAY_DB_SOCKET'] 
-			= getenv('PDO_SQLRELAY_DB_SOCKET') ? getenv('PDO_SQLRELAY_DB_SOCKET') : self::$configArray['PDO_SQLRELAY_DB_SOCKET'];
-
 		self::$configArray['PDO_SQLRELAY_DB_HOST'] 
-			= getenv('SQRPGSQL_MYSQL_HOST') ? getenv('SQRPGSQL_MYSQL_HOST') : self::$configArray['PDO_SQLRELAY_DB_HOST'];
+			= getenv('SQRPGSQL_PGSQL_HOST') ? getenv('SQRPGSQL_PGSQL_HOST') : self::$configArray['PDO_SQLRELAY_DB_HOST'];
 
 		self::$configArray['PDO_SQLRELAY_DB_PORT'] 
-			= getenv('SQRPGSQL_MYSQL_PORT') ? getenv('SQRPGSQL_MYSQL_PORT') : self::$configArray['PDO_SQLRELAY_DB_PORT'];
+			= getenv('SQRPGSQL_PGSQL_PORT') ? getenv('SQRPGSQL_PGSQL_PORT') : self::$configArray['PDO_SQLRELAY_DB_PORT'];
 	
 		self::$configArray['PDO_SQLRELAY_DB_USER'] 
-			= getenv('SQRPGSQL_MYSQL_USER') ? getenv('SQRPGSQL_MYSQL_USER') : self::$configArray['PDO_SQLRELAY_DB_USER'];
+			= getenv('SQRPGSQL_PGSQL_USER') ? getenv('SQRPGSQL_PGSQL_USER') : self::$configArray['PDO_SQLRELAY_DB_USER'];
 		
 		self::$configArray['PDO_SQLRELAY_DB_PW'] 
-			= getenv('SQRPGSQL_MYSQL_PASS') ? getenv('SQRPGSQL_MYSQL_PASS') : self::$configArray['PDO_SQLRELAY_DB_PW'];
-		
-		
+			= getenv('SQRPGSQL_PGSQL_PASS') ? getenv('SQRPGSQL_PGSQL_PASS') : self::$configArray['PDO_SQLRELAY_DB_PW'];
+			
 		self::$configArray['PDO_SQLRELAY_SOCKET'] 
 			= getenv('SQRPGSQL_SOCKET') ? getenv('SQRPGSQL_SOCKET') : self::$configArray['PDO_SQLRELAY_SOCKET'];
 		
@@ -96,7 +91,6 @@ FEOF;
 	{
 		self::envToConf();
 		$ret = self::$sqlrelayConfig;
-		$ret = preg_replace("/--PDO_SQLRELAY_DB_SOCKET--/", self::$configArray["PDO_SQLRELAY_DB_SOCKET"], $ret);
 		$ret = preg_replace("/--PDO_SQLRELAY_DB_HOST--/",   self::$configArray["PDO_SQLRELAY_DB_HOST"],   $ret);
 		$ret = preg_replace("/--PDO_SQLRELAY_DB_PORT--/",   self::$configArray["PDO_SQLRELAY_DB_PORT"],   $ret);
 		$ret = preg_replace("/--PDO_SQLRELAY_DB_USER--/",   self::$configArray["PDO_SQLRELAY_DB_USER"],   $ret);
