@@ -9,32 +9,32 @@ You can set the following environment variables to run the tests.
 For example:
 
 ```Shell
-SQRMYSQL_DSN=sqlrelay:socket=/tmp/sqlrelaymysqltest.socket;tries=1;retrytime=1;debug=0
-SQRMYSQL_USER=mysqltest
-SQRMYSQL_PASS=mysqltest
+export SQRMYSQL_DSN=sqlrelay:socket=/tmp/sqlrelaymysqltest.socket;tries=1;retrytime=1;debug=0
+export SQRMYSQL_USER=mysqltest
+export SQRMYSQL_PASS=mysqltest
 make test
 ```
 or
 
 ```Shell
-SQRMYSQL_DSN=
-SQRMYSQL_USE_LOCAL=y
-SQRMYSQL_LOCAL_BIN=/usr/local/firstwork/bin
-SQRMYSQL_MYSQL_HOST=127.0.0.1
-SQRMYSQL_MYSQL_PORT=3306
-SQRMYSQL_MYSQL_USER=testuser
-SQRMYSQL_MYSQL_PASS=testpass
+export SQRMYSQL_DSN=
+export SQRMYSQL_USE_LOCAL=y
+export SQRMYSQL_LOCAL_BIN=/usr/local/firstwork/bin
+export SQRMYSQL_MYSQL_HOST=127.0.0.1
+export SQRMYSQL_MYSQL_PORT=3306
+export SQRMYSQL_MYSQL_USER=testuser
+export SQRMYSQL_MYSQL_PASS=testpass
 make test
 ```
 or
 
 ```Shell
-SQRMYSQL_DSN=
-SQRMYSQL_USE_LOCAL=n
-SQRMYSQL_HOST=127.0.0.1
-SQRMYSQL_PORT=90000
-SQRMYSQL_USER=user
-SQRMYSQL_PASS=pass
+export SQRMYSQL_DSN=
+export SQRMYSQL_USE_LOCAL=n
+export SQRMYSQL_HOST=127.0.0.1
+export SQRMYSQL_PORT=90000
+export SQRMYSQL_USER=user
+export SQRMYSQL_PASS=pass
 make test
 ```
 ------

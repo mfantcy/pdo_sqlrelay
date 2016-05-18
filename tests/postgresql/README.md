@@ -10,32 +10,32 @@ You can set the following environment variables to run the tests.
 For example:
 
 ```Shell
-SQRPGSQL_DSN=sqlrelay:socket=/tmp/sqlrelaypostgresqltest.socket;tries=1;retrytime=1;debug=0
-SQRPGSQL_USER=pgsqltest
-SQRPGSQL_PASS=pgsqltest
+export SQRPGSQL_DSN=sqlrelay:socket=/tmp/sqlrelaypostgresqltest.socket;tries=1;retrytime=1;debug=0
+export SQRPGSQL_USER=pgsqltest
+export SQRPGSQL_PASS=pgsqltest
+export make test
+```
+or
+
+```Shell
+export SQRPGSQL_DSN=
+export SQRPGSQL_USE_LOCAL=y
+export SQRPGSQL_LOCAL_BIN=/usr/local/firstwork/bin
+export SQRPGSQL_PGSQL_HOST=localhost
+export SQRPGSQL_PGSQL_PORT=5432
+export SQRPGSQL_PGSQL_USER=testuser
+export SQRPGSQL_PGSQL_PASS=testpass
 make test
 ```
 or
 
 ```Shell
-SQRPGSQL_DSN=
-SQRPGSQL_USE_LOCAL=y
-SQRPGSQL_LOCAL_BIN=/usr/local/firstwork/bin
-SQRPGSQL_PGSQL_HOST=localhost
-SQRPGSQL_PGSQL_PORT=5432
-SQRPGSQL_PGSQL_USER=testuser
-SQRPGSQL_PGSQL_PASS=testpass
-make test
-```
-or
-
-```Shell
-SQRPGSQL_DSN=
-SQRPGSQL_USE_LOCAL=n
-SQRPGSQL_HOST=127.0.0.1
-SQRPGSQL_PORT=90000
-SQRPGSQL_USER=user
-SQRPGSQL_PASS=pass
+export SQRPGSQL_DSN=
+export SQRPGSQL_USE_LOCAL=n
+export SQRPGSQL_HOST=127.0.0.1
+export SQRPGSQL_PORT=90000
+export SQRPGSQL_USER=user
+export SQRPGSQL_PASS=pass
 make test
 ```
 ------
