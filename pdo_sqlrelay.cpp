@@ -6,16 +6,15 @@
  */
 
 /* $Id$ */
-
 #include "php_pdo_sqlrelay.hpp"
 
-typedef struct PDOSqlrstateStatePair
+typedef struct _PDOSqlrstateStatePair
 {
 	const int64_t errorNum;
 	const char * stateStr;
-};
+} PDOSqlrstateStatePair;
 
-static const struct PDOSqlrstateStatePair stateMap[] = {
+static const PDOSqlrstateStatePair stateMap[] = {
 	{ 1022, "23000"},
 	{ 1037, "HY001"},
 	{ 1038, "HY001"},
@@ -250,13 +249,13 @@ static const struct PDOSqlrstateStatePair stateMap[] = {
 
 static std::map<const int64_t, const char *> stateStdMap ;
 
-typedef struct PDOSqlrstateTypePair
+typedef struct _PDOSqlrstateTypePair
 {
 	const char * nativeType;
 	const int phpType;
-};
+} PDOSqlrstateTypePair;
 
-static const struct PDOSqlrstateTypePair typeMap[] = {
+static const PDOSqlrstateTypePair typeMap[] = {
 		{ "INT",        SQLRELAY_PHP_TYPE_LONG  },
 		{ "SMALLINT",   SQLRELAY_PHP_TYPE_LONG  },
 		{ "TINYINT",    SQLRELAY_PHP_TYPE_LONG  },
@@ -385,7 +384,7 @@ int getPHPTypeByNativeType(const char *nativeType)
 	return SQLRELAY_PHP_TYPE_STRING;
 }
 
-char * getPDOSqlState(const uint64_t errorNum)
+const char * getPDOSqlState(const uint64_t errorNum)
 {
 	std::map<const int64_t, const char *>::iterator it;
 	if (errorNum == 0)
@@ -393,7 +392,7 @@ char * getPDOSqlState(const uint64_t errorNum)
 
 	it = stateStdMap.find(errorNum);
 	if (it != stateStdMap.end())
-		return (char *)it->second;
+		return it->second;
 
 	return "HY000";
 }

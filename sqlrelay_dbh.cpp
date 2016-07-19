@@ -75,7 +75,7 @@ int _setPDOSqlrelayHandlerError(pdo_dbh_t *dbh, pdo_stmt_t *stmt, const char *me
 			return 0;
 		}
 	}
-	stateStr = getPDOSqlState(errorInfo->code);
+	stateStr = (char *)getPDOSqlState(errorInfo->code);
 	strcpy(*pdoError, stateStr);
 	if (sqlrelayHandler->debug) {
 		PDOSqlrelayDebugPrint(errorInfo->msg);
@@ -539,34 +539,34 @@ static int sqlrelayHandlerInTransaction(pdo_dbh_t *dbh TSRMLS_DC)
 
 static struct pdo_dbh_methods sqlrelay_methods = {
         sqlrealyHandlerClose,
-		sqlrelayHandlerPrepare,
-		sqlrelayHandlerExec,
-		NULL,
-		sqlrealyHandlerBegin,
-		sqlrelayHandlerCommit,
-		sqlrelayHandlerRollback,
-		sqlrelayHandlerSetAttr,
-		sqlrealyHandlerLastId,
-		sqlrealyHandlerFetchError,
-		sqlrelayHandlerGetAttr,
-        sqlrelayHandlerCheckLiveness,
-		NULL,
+        sqlrelayHandlerPrepare,
+        sqlrelayHandlerExec,
         NULL,
-		sqlrelayHandlerInTransaction
+        sqlrealyHandlerBegin,
+        sqlrelayHandlerCommit,
+        sqlrelayHandlerRollback,
+        sqlrelayHandlerSetAttr,
+        sqlrealyHandlerLastId,
+        sqlrealyHandlerFetchError,
+        sqlrelayHandlerGetAttr,
+        sqlrelayHandlerCheckLiveness,
+        NULL,
+        NULL,
+        sqlrelayHandlerInTransaction
 };
 
 static void parseDataSourceToHandler(pdo_dbh_t *dbh, PDOSqlrelayHandler *sqlrelayHandler)
 {
 	int atoiTmp;
-	struct pdo_data_src_parser vars[] = {
-        { "host",        NULL,        0 },
-        { "port",        NULL,        0 },
-        { "socket",      NULL,        0 },
-		{ "conntimeout", "5",         0 },
-		{ "resptimout",  "30",        0 },
-        { "retrytime",   "2",         0 },
-        { "tries",       "1",         0 },
-        { "debug",       "0",         0 },
+    struct pdo_data_src_parser vars[] = {
+        { (char *)"host",        NULL,        0 },
+        { (char *)"port",        NULL,        0 },
+        { (char *)"socket",      NULL,        0 },
+        { (char *)"conntimeout", (char *)"5",         0 },
+        { (char *)"resptimout",  (char *)"30",        0 },
+        { (char *)"retrytime",   (char *)"2",         0 },
+        { (char *)"tries",       (char *)"1",         0 },
+        { (char *)"debug",       (char *)"0",         0 }
     };
 
     sqlrelayHandler->connection = NULL;
