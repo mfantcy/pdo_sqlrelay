@@ -14,6 +14,7 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 
 extern "C" {
@@ -66,13 +67,13 @@ extern "C" {
 #define SQLRELAY_PHP_TYPE_DOUBLE 3
 #define SQLRELAY_PHP_TYPE_STRING 4
 
-typedef struct PDOSqlrelayErrorInfo
+typedef struct _PDOSqlrelayErrorInfo
 {
 	uint64_t code;
 	char *msg;
-};
+} PDOSqlrelayErrorInfo;
 
-typedef struct PDOSqlrelayHandler
+typedef struct _PDOSqlrelayHandler
 {
 	sqlrconnection * connection;
 	char * identify;
@@ -88,14 +89,14 @@ typedef struct PDOSqlrelayHandler
 	bool useNativeType;
     bool debug;
     bool inTnx;
-};
+} PDOSqlrelayHandler;
 
-typedef struct PDOSqlrelayColumn
+typedef struct _PDOSqlrelayColumn
 {
 	int phpType;
-};
+} PDOSqlrelayColumn;
 
-typedef struct PDOSqlrelayStatement
+typedef struct _PDOSqlrelayStatement
 {
 	sqlrcursor * cursor;
 	PDOSqlrelayHandler * handler;
@@ -115,9 +116,9 @@ typedef struct PDOSqlrelayStatement
 	bool fetched;
 	bool done;
 	bool cursorScroll;
-};
+} PDOSqlrelayStatement;
 
-typedef struct PDOSqlrelayParam
+typedef struct _PDOSqlrelayParam
 {
 	char * bindName;
 	long number;
@@ -126,7 +127,7 @@ typedef struct PDOSqlrelayParam
 	bool isNull;
 	bool isRef;
 	bool hasBound;
-};
+} PDOSqlrelayParam;
 
 extern pdo_driver_t PDOSqlrelayDriver;
 extern struct pdo_dbh_methods PDOSqlrelayHandleMethods;
@@ -138,7 +139,7 @@ extern int _setPDOSqlrelayHandlerError(pdo_dbh_t *dbh, pdo_stmt_t *stmt, const c
 extern void freePDOSqlrelayParam(PDOSqlrelayParam *sqlrelayParam);
 extern int sqlrelayDebugPrint(const char * tpl, ...);
 extern int PDOSqlrelayDebugPrint(const char * tpl, ...);
-extern char * getPDOSqlState(const uint64_t);
+extern const char * getPDOSqlState(const uint64_t);
 extern int getPHPTypeByNativeType(const char *nativeType);
 
 
